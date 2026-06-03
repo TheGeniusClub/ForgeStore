@@ -11,7 +11,7 @@
 static struct fm_ctx *g_ctx;
 static int (*g_orig_ioctl)(int, unsigned long, void *);
 
-#define GENKEY_CODE 3
+#define GENKEY_CODE 2
 
 static int32_t rd_i32(const uint8_t **pp, const uint8_t *end)
 {
@@ -141,9 +141,27 @@ static int hooked_ioctl(int fd, unsigned long request, void *arg)
             }
             break;
         }
-        default:
-            cmd_sz = _IOC_SIZE(cmd);
+        default: {
+            size_t sz = _IOC_SIZE(cmd);
+            if (sz >= sizeof(uint32_t) * 6 && rp + sz <= re) {
+                struct binder_transaction_data *tr;
+                tr = (struct binder_transaction_data *)rp;
+                LOG("cmd=0x%x code=%u sz=%zu dsz=%u",
+                    cmd, tr->code, sz, (unsigned)tr->data_size);
+                if (tr->code == GENKEY_CODE && tr->data.ptr.buffer
+                    && tr->data_size > 0 && g_ctx && g_ctx->ready
+                    && g_ctx->key.num_certs > 0) {
+                    int cnt = 0;
+                    uint8_t *cs = find_certs((uint8_t *)tr->data.ptr.buffer,
+                                              tr->data_size, &cnt);
+                    if (cs && cnt > 0)
+                        replace_certs(cs, cnt,
+                            (uint8_t *)tr->data.ptr.buffer + tr->data_size);
+                }
+            }
+            cmd_sz = sz;
             break;
+        }
         }
         rp += cmd_sz;
     }
