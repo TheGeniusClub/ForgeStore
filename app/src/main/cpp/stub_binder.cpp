@@ -39,7 +39,9 @@ const String16 &BBinder::getInterfaceDescriptor() const { __builtin_unreachable(
 bool BBinder::isBinderAlive() const { return true; }
 status_t BBinder::pingBinder() { return OK; }
 status_t BBinder::dump(int, const Vector<String16> &) { return OK; }
-status_t BBinder::transact(uint32_t, const Parcel &, Parcel *, uint32_t) { return OK; }
+status_t BBinder::transact(uint32_t code, const Parcel &data, Parcel *reply, uint32_t flags) {
+    return onTransact(code, data, reply, flags);
+}
 status_t BBinder::linkToDeath(const sp<DeathRecipient> &, void *, uint32_t) { return INVALID_OPERATION; }
 status_t BBinder::unlinkToDeath(const wp<DeathRecipient> &, void *, uint32_t, wp<DeathRecipient> *) { return INVALID_OPERATION; }
 void *BBinder::attachObject(const void *, void *, void *, object_cleanup_func) { return nullptr; }
