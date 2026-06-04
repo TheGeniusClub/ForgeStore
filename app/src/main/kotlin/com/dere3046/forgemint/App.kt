@@ -20,11 +20,12 @@ object App {
         modDir = System.getProperty("moddir", "/data/adb/modules/forgemint")
         Logger.i("ForgeMint daemon starting (moddir=$modDir)")
 
+        prepareEnvironment()
         setupProviders()
-        Looper.prepareMainLooper()
-
         ConfigManager.initialize()
         ConfigManager.checkTeeStatus()
+
+        initBootProperties()
 
         while (true) {
             try {
@@ -44,6 +45,38 @@ object App {
 
         Logger.i("ForgeMint daemon ready")
         Looper.loop()
+    }
+
+    private fun prepareEnvironment() {
+        if (Looper.getMainLooper() == null) {
+            @Suppress("deprecation") Looper.prepareMainLooper()
+        }
+        try {
+            val atClass = Class.forName("android.app.ActivityThread")
+            val activityThread = atClass.getMethod("systemMain").invoke(null)
+            val systemContext = atClass.getMethod("getSystemContext").invoke(activityThread)
+            val app = Class.forName("android.app.Application").getDeclaredConstructor().newInstance()
+            val attachMethod = Class.forName("android.content.ContextWrapper")
+                .getDeclaredMethod("attachBaseContext", Class.forName("android.content.Context"))
+            attachMethod.isAccessible = true
+            attachMethod.invoke(app, systemContext)
+            val field = atClass.getDeclaredField("mInitialApplication")
+            field.isAccessible = true
+            field.set(activityThread, app)
+            Logger.i("ActivityThread initialized")
+        } catch (e: Exception) {
+            Logger.w("ActivityThread setup failed", e)
+        }
+    }
+
+    private fun initBootProperties() {
+        try {
+            AttestationBuilder.bootKey
+            AttestationBuilder.bootHash
+            Logger.i("Boot properties initialized")
+        } catch (e: Exception) {
+            Logger.w("Boot property init failed", e)
+        }
     }
 
     private fun connectInterceptor(ksBinder: IBinder): Boolean {
