@@ -205,9 +205,13 @@ class KeyMintInterceptor(
 
             val operation = SoftwareOperation(txId, entry.keyPair, parsedParams)
             val binder = SoftwareOperationBinder(operation)
+            val response = android.system.keystore2.CreateOperationResponse().apply {
+                iOperation = binder
+                operationChallenge = null
+            }
             val override = Parcel.obtain()
             override.writeNoException()
-            override.writeStrongBinder(binder)
+            override.writeTypedObject(response, 0)
             return TransactionResult.OverrideReply(override)
         } catch (e: Exception) {
             Logger.e("createOperation failed", e)
@@ -392,13 +396,9 @@ class KeyMintInterceptor(
             certChain = chain.map { it as X509Certificate },
         ))
 
-        val response = android.system.keystore2.KeyEntryResponse().apply {
-            this.metadata = metadata
-            iSecurityLevel = android.system.keystore2.IKeystoreSecurityLevel.Stub.asInterface(originalBinder)
-        }
         val override = Parcel.obtain()
         override.writeNoException()
-        override.writeTypedObject(response, 0)
+        override.writeTypedObject(metadata, 0)
         return TransactionResult.OverrideReply(override)
     }
 }

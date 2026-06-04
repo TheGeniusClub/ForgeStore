@@ -117,6 +117,9 @@ class Keystore2Interceptor : BinderInterceptor() {
             if (StateManager.lookup(uid, alias) != null) {
                 Logger.i("deleteKey alias=$alias UID=$uid → cleaning up")
                 StateManager.remove(uid, alias)
+                val reply = Parcel.obtain()
+                reply.writeNoException()
+                return TransactionResult.OverrideReply(reply)
             }
         } catch (_: Exception) {}
         return TransactionResult.Continue
