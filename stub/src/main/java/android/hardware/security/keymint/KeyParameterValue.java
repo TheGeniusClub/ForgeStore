@@ -3,7 +3,7 @@ package android.hardware.security.keymint;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-public class KeyParameterValue implements Parcelable {
+public final class KeyParameterValue implements Parcelable {
     public static final int algorithm = 1;
     public static final int blob = 14;
     public static final int blockMode = 2;

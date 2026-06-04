@@ -9,6 +9,7 @@
 #include <linux/android/binder.h>
 #include <binder/Binder.h>
 #include <binder/IBinder.h>
+#include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 #include <thread>
 #include <mutex>
@@ -133,8 +134,8 @@ status_t BinderStub::onTransact(uint32_t code, const Parcel &data,
     pre_req.writeStrongBinder(real_target);
     pre_req.writeUint32(info.code);
     pre_req.writeUint32(flags);
-    pre_req.writeInt32(info.uid);
-    pre_req.writeInt32(info.pid);
+    pre_req.writeInt32(IPCThreadState::self()->getCallingUid());
+    pre_req.writeInt32(IPCThreadState::self()->getCallingPid());
     pre_req.writeUint64(data.dataSize());
     pre_req.appendFrom(&data, 0, data.dataSize());
 
@@ -170,8 +171,8 @@ status_t BinderStub::onTransact(uint32_t code, const Parcel &data,
         post_req.writeStrongBinder(real_target);
         post_req.writeUint32(info.code);
         post_req.writeUint32(flags);
-        post_req.writeInt32(info.uid);
-        post_req.writeInt32(info.pid);
+        post_req.writeInt32(IPCThreadState::self()->getCallingUid());
+        post_req.writeInt32(IPCThreadState::self()->getCallingPid());
         const Parcel &post_data = use_modified_data ? final_data : data;
         post_req.writeUint64(post_data.dataSize());
         post_req.appendFrom(&post_data, 0, post_data.dataSize());

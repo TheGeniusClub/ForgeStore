@@ -388,13 +388,13 @@ class KeyMintInterceptor(
             metadata = metadata,
             keyPair = keyPair,
             securityLevel = securityLevel,
-            securityLevelBinder = originalBinder,
+            securityLevelBinder = android.system.keystore2.IKeystoreSecurityLevel.Stub.asInterface(originalBinder),
             certChain = chain.map { it as X509Certificate },
         ))
 
         val response = android.system.keystore2.KeyEntryResponse().apply {
             this.metadata = metadata
-            iSecurityLevel = originalBinder
+            iSecurityLevel = android.system.keystore2.IKeystoreSecurityLevel.Stub.asInterface(originalBinder)
         }
         val override = Parcel.obtain()
         override.writeNoException()

@@ -1,6 +1,7 @@
 package com.dere3046.forgemint
 
 import android.os.IBinder
+import android.system.keystore2.IKeystoreSecurityLevel
 import android.system.keystore2.KeyMetadata
 import java.security.KeyPair
 import java.security.cert.Certificate
@@ -18,7 +19,7 @@ object StateManager {
         val metadata: KeyMetadata,
         val keyPair: KeyPair,
         val securityLevel: Int,
-        val securityLevelBinder: IBinder,
+        val securityLevelBinder: IKeystoreSecurityLevel,
         val certChain: List<X509Certificate>,
     )
 

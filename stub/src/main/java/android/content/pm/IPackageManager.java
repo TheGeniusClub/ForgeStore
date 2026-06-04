@@ -4,6 +4,8 @@ import android.os.IBinder;
 
 public interface IPackageManager {
     String[] getPackagesForUid(int uid);
+    PackageInfo getPackageInfo(String packageName, long flags, int userId);
+    PackageInfo getPackageInfo(String packageName, int flags, int userId);
 
     class Stub {
         public static IPackageManager asInterface(IBinder binder) {

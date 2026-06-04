@@ -7,4 +7,13 @@ public class ServiceManager {
     public static IBinder waitForService(String name) {
         throw new UnsupportedOperationException("STUB!");
     }
+    public static void addService(String name, IBinder service) {
+        throw new UnsupportedOperationException("STUB!");
+    }
+    public static IBinder checkService(String name) {
+        throw new UnsupportedOperationException("STUB!");
+    }
+    public static String[] listServices() {
+        throw new UnsupportedOperationException("STUB!");
+    }
 }

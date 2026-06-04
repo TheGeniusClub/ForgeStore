@@ -1,12 +1,11 @@
 package android.system.keystore2;
 
-import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Parcelable;
 
 public class KeyEntryResponse implements Parcelable {
     public KeyMetadata metadata;
-    public IBinder iSecurityLevel;
+    public IKeystoreSecurityLevel iSecurityLevel;
 
     public static final Parcelable.Creator<KeyEntryResponse> CREATOR =
             new Parcelable.Creator<>() {

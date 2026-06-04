@@ -4,7 +4,7 @@ import android.os.Parcel;
 import android.os.Parcelable;
 
 public class KeyParameter implements Parcelable {
-    public int tag;
+    public int tag = 0;
     public KeyParameterValue value;
 
     public static final Parcelable.Creator<KeyParameter> CREATOR =
