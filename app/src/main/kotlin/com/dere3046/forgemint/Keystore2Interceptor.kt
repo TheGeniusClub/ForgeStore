@@ -102,7 +102,7 @@ class Keystore2Interceptor : BinderInterceptor() {
             val generated = StateManager.listForUid(uid)
             for (gk in generated) {
                 entries.add(KeyDescriptor().apply {
-                    domain = Domain.KEY_ID
+                    domain = Domain.APP
                     nspace = gk.nspace
                     alias = gk.alias
                     blob = null

@@ -1,8 +1,10 @@
 package com.dere3046.forgemint
 
+import android.hardware.security.keymint.KeyOrigin
 import android.hardware.security.keymint.KeyParameter
 import android.hardware.security.keymint.KeyParameterValue
 import android.hardware.security.keymint.Tag
+import android.os.Build
 import android.os.IBinder
 import android.os.Parcel
 import android.system.keystore2.Authorization
@@ -155,36 +157,93 @@ class KeyMintInterceptor(
         }
     }
 
-    private fun buildAuthorizations(params: KeyMintAttestation): Array<Authorization> {
+    private fun buildAuthorizations(params: KeyMintAttestation, callingUid: Int): Array<Authorization> {
         val list = mutableListOf<Authorization>()
 
-        fun addAuth(tag: Int, value: KeyParameterValue.() -> Unit) {
+        fun addAuth(tag: Int, level: Int, value: KeyParameterValue.() -> Unit) {
             val kp = KeyParameter()
             kp.tag = tag
             kp.value = KeyParameterValue().apply(value)
-            list.add(Authorization().apply { keyParameter = kp })
+            list.add(Authorization().apply {
+                keyParameter = kp
+                this.securityLevel = level
+            })
         }
 
+        addAuth(Tag.ALGORITHM, securityLevel) { algorithm = params.algorithm }
         for (p in params.purpose) {
-            addAuth(Tag.PURPOSE) { keyPurpose = p }
-        }
-        if (params.algorithm != 0) {
-            addAuth(Tag.ALGORITHM) { algorithm = params.algorithm }
+            addAuth(Tag.PURPOSE, securityLevel) { keyPurpose = p }
         }
         if (params.keySize > 0) {
-            addAuth(Tag.KEY_SIZE) { integer = params.keySize }
-        }
-        for (d in params.digest) {
-            addAuth(Tag.DIGEST) { digest = d }
+            addAuth(Tag.KEY_SIZE, securityLevel) { integer = params.keySize }
         }
         if (params.ecCurve != null) {
-            addAuth(Tag.EC_CURVE) { ecCurve = params.ecCurve }
+            addAuth(Tag.EC_CURVE, securityLevel) { ecCurve = params.ecCurve }
         }
         if (params.rsaPublicExponent != null) {
-            addAuth(Tag.RSA_PUBLIC_EXPONENT) { longInteger = params.rsaPublicExponent.toLong() }
+            addAuth(Tag.RSA_PUBLIC_EXPONENT, securityLevel) { longInteger = params.rsaPublicExponent.toLong() }
         }
+        for (d in params.digest) {
+            addAuth(Tag.DIGEST, securityLevel) { digest = d }
+        }
+        for (m in params.blockMode) {
+            addAuth(Tag.BLOCK_MODE, securityLevel) { blockMode = m }
+        }
+        for (p in params.padding) {
+            addAuth(Tag.PADDING, securityLevel) { paddingMode = p }
+        }
+        if (params.noAuthRequired != null) {
+            addAuth(Tag.NO_AUTH_REQUIRED, securityLevel) { boolValue = params.noAuthRequired }
+        }
+        addAuth(Tag.ORIGIN, securityLevel) { origin = params.origin ?: KeyOrigin.GENERATED }
+        addAuth(Tag.OS_VERSION, securityLevel) { integer = osVersion() }
+        addAuth(Tag.OS_PATCHLEVEL, securityLevel) { integer = parsePatchLevel(Build.VERSION.SECURITY_PATCH) }
+        addAuth(Tag.VENDOR_PATCHLEVEL, securityLevel) { integer = parsePatchLevel(Build.VERSION.SECURITY_PATCH) }
+        addAuth(Tag.BOOT_PATCHLEVEL, securityLevel) { integer = parsePatchLevel(Build.VERSION.SECURITY_PATCH) }
+        addAuth(Tag.CREATION_DATETIME, securityLevel) { dateTime = System.currentTimeMillis() }
 
         return list.toTypedArray()
+    }
+
+    companion object {
+        private fun osVersion(): Int = when (Build.VERSION.SDK_INT) {
+            29 -> 100000
+            30 -> 110000
+            31 -> 120000
+            32 -> 120100
+            33 -> 130000
+            34 -> 140000
+            35 -> 150000
+            36 -> 160000
+            else -> 150000
+        }
+
+        private fun parsePatchLevel(patch: String?): Int {
+            if (patch == null) return 240601
+            val parts = patch.split("-")
+            if (parts.size < 2) return 240601
+            val date = parts[0]
+            val digits = date.replace("-", "")
+            if (digits.length < 6) return 240601
+            val year = digits.substring(2, 4).toIntOrNull() ?: 24
+            val month = digits.substring(4, 6).toIntOrNull() ?: 6
+            return year * 100 + month
+        }
+
+        val GENERATE_KEY_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_generateKey") }
+        val CREATE_OPERATION_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_createOperation") }
+
+        private fun resolveCode(name: String): Int {
+            return try {
+                IKeystoreSecurityLevel.Stub::class.java
+                    .getDeclaredField(name)
+                    .apply { isAccessible = true }
+                    .getInt(null)
+            } catch (e: Exception) {
+                Logger.e("Failed to resolve $name", e)
+                -1
+            }
+        }
     }
 
     private fun tryGenerateSoftwareKey(
@@ -192,7 +251,7 @@ class KeyMintInterceptor(
         originalDescriptor: KeyDescriptor,
         uid: Int,
     ): TransactionResult? {
-        val keybox = KeyboxReader.loadKeybox() ?: return null
+        val keybox = KeyboxReader.loadKeybox(params.algorithm) ?: return null
         if (keybox.certificates.isEmpty()) return null
 
         val keyPair = CertificateBuilder.generateKeyPair(params) ?: return null
@@ -212,7 +271,7 @@ class KeyMintInterceptor(
             keySecurityLevel = securityLevel
             key = descriptor
             modificationTimeMs = System.currentTimeMillis()
-            authorizations = buildAuthorizations(params)
+            authorizations = buildAuthorizations(params, uid)
             certificate = chain[0].encoded
             certificateChain = if (chain.size > 1) {
                 chain.drop(1).flatMap { it.encoded.toList() }.toByteArray()
@@ -234,22 +293,5 @@ class KeyMintInterceptor(
         override.writeNoException()
         override.writeTypedObject(metadata, 0)
         return TransactionResult.OverrideReply(override)
-    }
-
-    companion object {
-        val GENERATE_KEY_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_generateKey") }
-        val CREATE_OPERATION_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_createOperation") }
-
-        private fun resolveCode(name: String): Int {
-            return try {
-                IKeystoreSecurityLevel.Stub::class.java
-                    .getDeclaredField(name)
-                    .apply { isAccessible = true }
-                    .getInt(null)
-            } catch (e: Exception) {
-                Logger.e("Failed to resolve $name", e)
-                -1
-            }
-        }
     }
 }

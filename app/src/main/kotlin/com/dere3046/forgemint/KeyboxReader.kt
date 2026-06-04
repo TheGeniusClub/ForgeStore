@@ -1,5 +1,6 @@
 package com.dere3046.forgemint
 
+import android.hardware.security.keymint.Algorithm
 import android.security.keystore.KeyProperties
 import org.bouncycastle.openssl.PEMParser
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter
@@ -19,33 +20,42 @@ object KeyboxReader {
 
     private const val KEYBOX_FILE = "/data/adb/forgemint/keybox.xml"
 
-    private var cachedKeybox: CertificateBuilder.KeyboxData? = null
+    private var keyboxCache: Map<String, CertificateBuilder.KeyboxData>? = null
 
-    fun loadKeybox(): CertificateBuilder.KeyboxData? {
-        if (cachedKeybox != null) return cachedKeybox
+    fun loadKeybox(algorithm: Int? = null): CertificateBuilder.KeyboxData? {
+        val algoKey = algorithm?.let { algoToKey(it) } ?: return singleKey()
+        val cache = keyboxCache ?: reload()
+        return cache[algoKey]
+    }
+    private fun algoToKey(algo: Int): String = when (algo) {
+        Algorithm.RSA -> KeyProperties.KEY_ALGORITHM_RSA
+        Algorithm.EC -> KeyProperties.KEY_ALGORITHM_EC
+        else -> ""
+    }
 
+    private fun singleKey(): CertificateBuilder.KeyboxData? {
+        val cache = keyboxCache ?: reload()
+        return cache.values.firstOrNull()
+    }
+
+    private fun reload(): Map<String, CertificateBuilder.KeyboxData> {
         val file = File(KEYBOX_FILE)
         if (!file.exists()) {
             Logger.w("Keybox file not found: $KEYBOX_FILE")
-            return null
+            return emptyMap()
         }
-
         return try {
             val xmlContent = file.readText().trimStart('\uFEFF', '\uFFFE', ' ')
-            val keyMap = parseXml(xmlContent)
-            val kd = keyMap.values.firstOrNull() ?: run {
-                Logger.w("No keys found in keybox.xml")
-                return null
-            }
-            cachedKeybox = kd
-            kd
+            val map = parseXml(xmlContent)
+            keyboxCache = map
+            map
         } catch (e: Exception) {
             Logger.e("Failed to load keybox", e)
-            null
+            emptyMap()
         }
     }
 
-    fun clearCache() { cachedKeybox = null }
+    fun clearCache() { keyboxCache = null }
 
     private fun parseXml(xmlContent: String): Map<String, CertificateBuilder.KeyboxData> {
         val found = mutableMapOf<String, CertificateBuilder.KeyboxData>()

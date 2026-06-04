@@ -6,6 +6,7 @@ import android.os.Parcelable;
 
 public class Authorization implements Parcelable {
     public KeyParameter keyParameter;
+    public int securityLevel;
 
     public static final Parcelable.Creator<Authorization> CREATOR =
             new Parcelable.Creator<>() {
