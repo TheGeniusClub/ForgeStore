@@ -57,7 +57,6 @@ open class BinderInterceptor : Binder() {
             val dataSize = data.readLong().toInt()
             val subData = Parcel.obtain()
             subData.appendFrom(data, data.dataPosition(), dataSize)
-            Logger.d("handlePreTransact: dataSizeOrig=$dataSize subDataSize=${subData.dataSize()} dataPos=${data.dataPosition()}")
             subData.setDataPosition(0)
             data.setDataPosition(data.dataPosition() + dataSize)
 
