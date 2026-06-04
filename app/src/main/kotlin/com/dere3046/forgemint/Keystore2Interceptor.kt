@@ -55,8 +55,7 @@ class Keystore2Interceptor : BinderInterceptor() {
 
     private fun handleGetKeyEntry(data: Parcel, uid: Int): TransactionResult {
         try {
-            data.readInt()
-            data.readString()
+            data.enforceInterface(IKeystoreService.DESCRIPTOR)
             val descriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Continue
             val alias = descriptor.alias ?: return TransactionResult.Continue
 
@@ -80,8 +79,7 @@ class Keystore2Interceptor : BinderInterceptor() {
 
     private fun handleDeleteKey(data: Parcel, uid: Int): TransactionResult {
         try {
-            data.readInt()
-            data.readString()
+            data.enforceInterface(IKeystoreService.DESCRIPTOR)
             val descriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Continue
             val alias = descriptor.alias ?: return TransactionResult.Continue
 

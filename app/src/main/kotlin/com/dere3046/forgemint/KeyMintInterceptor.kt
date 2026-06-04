@@ -125,8 +125,7 @@ class KeyMintInterceptor(
 
     private fun handlePostCreateOperation(uid: Int, data: Parcel, reply: Parcel, target: IBinder): TransactionResult {
         try {
-            data.readInt()
-            data.readString()
+            data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
             data.readTypedObject(KeyDescriptor.CREATOR)
             data.createTypedArray(KeyParameter.CREATOR)
             data.readBoolean()
@@ -154,8 +153,7 @@ class KeyMintInterceptor(
         data: Parcel,
     ): TransactionResult {
         try {
-            data.readInt()
-            data.readString()
+            data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
             val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Continue
             data.createTypedArray(KeyParameter.CREATOR) // skip params
             data.readBoolean() // skip forced
@@ -179,8 +177,7 @@ class KeyMintInterceptor(
 
     private fun parseParams(data: Parcel): GenerateKeyParams? {
         return try {
-            data.readInt()
-            data.readString()
+            data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
             val descriptor = data.readTypedObject(KeyDescriptor.CREATOR)
                 ?: return null
             val attestationKeyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
