@@ -41,6 +41,10 @@ class KeyMintInterceptor(
             return handleCreateOperation(txId, callingUid, data)
         }
 
+        if (code == IMPORT_KEY_TRANSACTION) {
+            return handleImportKey(callingUid, data)
+        }
+
         if (code != GENERATE_KEY_TRANSACTION) {
             return TransactionResult.ContinueAndSkipPost
         }
@@ -55,7 +59,8 @@ class KeyMintInterceptor(
         val params = genParams.attestation
 
         val needsSoftwareGen = ConfigManager.shouldGenerate(callingUid) ||
-            (ConfigManager.shouldPatch(callingUid) && params.isAttestKey)
+            (ConfigManager.shouldPatch(callingUid) && params.isAttestKey) ||
+            (genParams.attestationKeyDescriptor != null && isKnownAttestationKey(callingUid, genParams.attestationKeyDescriptor))
 
         if (needsSoftwareGen) {
             val result = tryGenerateSoftwareKey(params, genParams.descriptor, genParams.attestationKeyDescriptor, callingUid)
@@ -93,6 +98,10 @@ class KeyMintInterceptor(
 
         if (code == CREATE_OPERATION_TRANSACTION) {
             return handlePostCreateOperation(callingUid, data, reply, target)
+        }
+
+        if (code == IMPORT_KEY_TRANSACTION) {
+            return handlePostImportKey(callingUid, data)
         }
 
         return TransactionResult.Skip
@@ -157,6 +166,19 @@ class KeyMintInterceptor(
         } catch (e: Exception) {
             Logger.e("Post createOperation failed", e)
         }
+        return TransactionResult.Skip
+    }
+
+    private fun handlePostImportKey(uid: Int, data: Parcel): TransactionResult {
+        try {
+            data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
+            val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Skip
+            val alias = keyDescriptor.alias
+            if (alias != null && StateManager.lookup(uid, alias) != null) {
+                Logger.i("importKey alias=$alias UID=$uid → cleaning up generated key")
+                StateManager.remove(uid, alias)
+            }
+        } catch (_: Exception) {}
         return TransactionResult.Skip
     }
 
@@ -261,6 +283,7 @@ class KeyMintInterceptor(
     companion object {
         val GENERATE_KEY_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_generateKey") }
         val CREATE_OPERATION_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_createOperation") }
+        val IMPORT_KEY_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_importKey") }
 
         private fun resolveCode(name: String): Int {
             return try {
@@ -273,6 +296,24 @@ class KeyMintInterceptor(
                 -1
             }
         }
+    }
+
+    private fun isKnownAttestationKey(uid: Int, descriptor: KeyDescriptor): Boolean {
+        val entry = StateManager.lookup(uid, descriptor.alias ?: return false)
+            ?: StateManager.lookupByNspace(uid, descriptor.nspace)
+        return entry != null
+    }
+
+    private fun handleImportKey(uid: Int, data: Parcel): TransactionResult {
+        try {
+            data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
+            val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
+            val alias = keyDescriptor?.alias
+            if (alias != null) {
+                Logger.i("importKey alias=$alias UID=$uid → forwarding to HAL, will cleanup on success")
+            }
+        } catch (_: Exception) {}
+        return TransactionResult.Continue
     }
 
     private fun tryGenerateSoftwareKey(

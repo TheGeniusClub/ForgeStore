@@ -29,6 +29,9 @@ class Keystore2Interceptor : BinderInterceptor() {
         if (shouldSkip(callingUid)) {
             return TransactionResult.ContinueAndSkipPost
         }
+        if (code == LIST_ENTRIES_TRANSACTION || code == LIST_ENTRIES_BATCHED_TRANSACTION) {
+            if (isGms(callingUid)) return TransactionResult.ContinueAndSkipPost
+        }
         return TransactionResult.Continue
     }
 
@@ -102,6 +105,20 @@ class Keystore2Interceptor : BinderInterceptor() {
 
             val response = reply.readTypedObject(KeyEntryResponse.CREATOR) ?: return TransactionResult.Skip
 
+            val authorizations = response.metadata.authorizations
+            val parsedParams = KeyMintAttestation(
+                authorizations?.map { it.keyParameter }?.toTypedArray() ?: emptyArray()
+            )
+
+            if (parsedParams.isImportKey) {
+                Logger.d("getKeyEntry POST: skip patching for imported key alias=${keyDescriptor.alias}")
+                return TransactionResult.Skip
+            }
+
+            if (parsedParams.isAttestKey) {
+                return handleAttestKeyOverride(uid, keyDescriptor, response, parsedParams)
+            }
+
             val originalChain = CertificateHelper.getCertificateChain(response.metadata) ?: return TransactionResult.Skip
 
             if (originalChain.size <= 1) {
@@ -133,6 +150,45 @@ class Keystore2Interceptor : BinderInterceptor() {
             Logger.e("getKeyEntry POST patch failed", e)
             return TransactionResult.Skip
         }
+    }
+
+    private fun handleAttestKeyOverride(uid: Int, keyDescriptor: KeyDescriptor, response: KeyEntryResponse, params: KeyMintAttestation): TransactionResult {
+        Logger.i("getKeyEntry POST: overriding hardware attest key alias=${keyDescriptor.alias}")
+
+        val keybox = KeyboxReader.loadKeybox(params.algorithm) ?: return TransactionResult.Skip
+        if (keybox.certificates.isEmpty()) return TransactionResult.Skip
+
+        val keyPair = CertificateBuilder.generateKeyPair(params) ?: return TransactionResult.Skip
+
+        val chain = CertificateBuilder.generateCertificateChain(
+            keyPair, keybox, params, uid,
+            response.metadata.keySecurityLevel,
+        ) ?: return TransactionResult.Skip
+
+        CertificateHelper.updateCertificateChain(uid, response.metadata, chain.toTypedArray())
+            .onFailure { e -> Logger.e("updateCertificateChain failed for attest key", e) }
+
+        val key = response.metadata.key ?: return TransactionResult.Skip
+        key.nspace = java.security.SecureRandom().nextLong()
+
+        val alias = keyDescriptor.alias ?: return TransactionResult.Skip
+        val entry = StateManager.KeyEntry(
+            uid = uid,
+            alias = alias,
+            nspace = key.nspace,
+            metadata = response.metadata,
+            keyPair = keyPair,
+            securityLevel = response.metadata.keySecurityLevel,
+            securityLevelBinder = response.iSecurityLevel ?: return TransactionResult.Skip,
+            certChain = chain.map { it as java.security.cert.X509Certificate },
+        )
+        StateManager.store(entry)
+        Logger.i("Stored attest key override alias=$alias nspace=${key.nspace}")
+
+        val override = Parcel.obtain()
+        override.writeNoException()
+        override.writeTypedObject(response, 0)
+        return TransactionResult.OverrideReply(override)
     }
 
     private fun injectGeneratedKeys(reply: Parcel, uid: Int): TransactionResult {
@@ -167,6 +223,15 @@ class Keystore2Interceptor : BinderInterceptor() {
 
     private fun shouldSkip(uid: Int): Boolean {
         return uid < 10000 || ConfigManager.shouldSkip(uid)
+    }
+
+    private fun isGms(uid: Int): Boolean {
+        return try {
+            val pmBinder = android.os.ServiceManager.getService("package") ?: return false
+            val pm = android.content.pm.IPackageManager.Stub.asInterface(pmBinder)
+            val packages = pm.getPackagesForUid(uid)?.toList() ?: emptyList()
+            packages.any { it == "com.google.android.gms" }
+        } catch (_: Exception) { false }
     }
 
     companion object {
