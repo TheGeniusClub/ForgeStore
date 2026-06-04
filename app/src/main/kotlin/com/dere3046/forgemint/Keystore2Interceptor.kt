@@ -96,24 +96,26 @@ class Keystore2Interceptor : BinderInterceptor() {
     private fun injectGeneratedKeys(reply: Parcel, uid: Int): TransactionResult {
         try {
             reply.readException()
-            val entries = reply.createTypedArray(KeyDescriptor.CREATOR)?.toMutableList()
-                ?: return TransactionResult.Skip
+            val existing = mutableMapOf<String, KeyDescriptor>()
+            reply.createTypedArray(KeyDescriptor.CREATOR)?.forEach { kd ->
+                kd.alias?.let { existing.putIfAbsent(it, kd) }
+            }
 
             val generated = StateManager.listForUid(uid)
             for (gk in generated) {
-                entries.add(KeyDescriptor().apply {
+                existing[gk.alias] = KeyDescriptor().apply {
                     domain = Domain.APP
                     nspace = gk.nspace
                     alias = gk.alias
                     blob = null
-                })
+                }
             }
 
-            Logger.i("listEntries injected ${generated.size} keys for UID=$uid (total=${entries.size})")
+            Logger.i("listEntries injected ${generated.size} keys for UID=$uid (total=${existing.size})")
 
             val override = Parcel.obtain()
             override.writeNoException()
-            override.writeTypedArray(entries.toTypedArray(), 0)
+            override.writeTypedArray(existing.values.toTypedArray(), 0)
             return TransactionResult.OverrideReply(override)
         } catch (e: Exception) {
             Logger.e("listEntries injection failed", e)

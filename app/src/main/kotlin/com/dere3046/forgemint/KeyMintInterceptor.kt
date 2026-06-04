@@ -23,6 +23,7 @@ class KeyMintInterceptor(
     data class GenerateKeyParams(
         val attestation: KeyMintAttestation,
         val descriptor: KeyDescriptor,
+        val attestationKeyDescriptor: KeyDescriptor?,
     )
 
     override fun onPreTransact(
@@ -56,7 +57,7 @@ class KeyMintInterceptor(
         }
 
         if (ConfigManager.shouldGenerate(callingUid)) {
-            val result = tryGenerateSoftwareKey(params, genParams.descriptor, callingUid)
+            val result = tryGenerateSoftwareKey(params, genParams.descriptor, genParams.attestationKeyDescriptor, callingUid)
             if (result != null) {
                 Logger.i("Software key generated for UID=$callingUid")
                 return result
@@ -147,10 +148,10 @@ class KeyMintInterceptor(
             data.readString()
             val descriptor = data.readTypedObject(KeyDescriptor.CREATOR)
                 ?: return null
-            data.readTypedObject(KeyDescriptor.CREATOR) // attestationKey (optional)
+            val attestationKeyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
             val params = data.createTypedArray(KeyParameter.CREATOR) ?: return null
             data.readInt() // flags
-            GenerateKeyParams(KeyMintAttestation(params), descriptor)
+            GenerateKeyParams(KeyMintAttestation(params), descriptor, attestationKeyDescriptor)
         } catch (e: Exception) {
             Logger.e("Failed to parse generateKey params", e)
             null
@@ -219,15 +220,9 @@ class KeyMintInterceptor(
         }
 
         private fun parsePatchLevel(patch: String?): Int {
-            if (patch == null) return 240601
-            val parts = patch.split("-")
-            if (parts.size < 2) return 240601
-            val date = parts[0]
-            val digits = date.replace("-", "")
-            if (digits.length < 6) return 240601
-            val year = digits.substring(2, 4).toIntOrNull() ?: 24
-            val month = digits.substring(4, 6).toIntOrNull() ?: 6
-            return year * 100 + month
+            if (patch == null) return 20250605
+            val digits = patch.replace("-", "")
+            return digits.take(8).toIntOrNull() ?: 20250605
         }
 
         val GENERATE_KEY_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_generateKey") }
@@ -249,15 +244,23 @@ class KeyMintInterceptor(
     private fun tryGenerateSoftwareKey(
         params: KeyMintAttestation,
         originalDescriptor: KeyDescriptor,
+        attestKeyDescriptor: KeyDescriptor?,
         uid: Int,
     ): TransactionResult? {
         val keybox = KeyboxReader.loadKeybox(params.algorithm) ?: return null
         if (keybox.certificates.isEmpty()) return null
 
+        val signerKeyPair = if (attestKeyDescriptor != null) {
+            val attestEntry = StateManager.lookup(uid, attestKeyDescriptor.alias ?: return null)
+                ?: StateManager.lookupByNspace(uid, attestKeyDescriptor.nspace)
+            attestEntry?.keyPair
+        } else null
+
         val keyPair = CertificateBuilder.generateKeyPair(params) ?: return null
 
         val chain = CertificateBuilder.generateCertificateChain(
             keyPair, keybox, params, uid, securityLevel,
+            signerKeyPair,
         ) ?: return null
 
         val nspace = SecureRandom().nextLong()

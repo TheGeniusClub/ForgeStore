@@ -65,11 +65,16 @@ object CertificateBuilder {
         params: KeyMintAttestation,
         uid: Int,
         securityLevel: Int,
+        signerKeyPair: KeyPair? = null,
     ): List<Certificate>? {
         return runCatching {
-            val issuerName = X509CertificateHolder(keybox.certificates[0].encoded).subject
+            val signingKey = signerKeyPair ?: keybox.keyPair
+            val issuerName = if (signerKeyPair != null)
+                X500Name("CN=Android Keystore Key")
+            else
+                X509CertificateHolder(keybox.certificates[0].encoded).subject
             val leafCert = buildLeafCertificate(
-                subjectKeyPair, keybox.keyPair, issuerName,
+                subjectKeyPair, signingKey, issuerName,
                 params, uid, securityLevel,
             )
             listOf(leafCert) + keybox.certificates

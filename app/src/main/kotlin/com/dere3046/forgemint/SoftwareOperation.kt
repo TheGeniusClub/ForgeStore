@@ -12,6 +12,7 @@ class SoftwareOperation(
     private val nspace: Long,
     private val alias: String,
     private val uid: Int,
+    private val params: KeyMintAttestation? = null,
 ) : Binder() {
 
     private var canceled = false
@@ -80,15 +81,30 @@ class SoftwareOperation(
 
     private fun getOrCreateSigner(): Signature {
         if (signer != null) return signer!!
-        val algorithm = when (keyPair.private) {
-            is ECKey -> "SHA256withECDSA"
-            is RSAKey -> "SHA256withRSA"
-            else -> "SHA256withECDSA"
-        }
+        val algorithm = getSignatureAlgorithm()
         val sig = Signature.getInstance(algorithm)
         sig.initSign(keyPair.private)
         signer = sig
         return sig
+    }
+
+    private fun getSignatureAlgorithm(): String {
+        val p = params
+        val digest = if (p != null && p.digest.isNotEmpty()) {
+            when (p.digest.first()) {
+                2 -> "SHA224"
+                3 -> "SHA256"
+                4 -> "SHA384"
+                5 -> "SHA512"
+                else -> "SHA256"
+            }
+        } else "SHA256"
+        val keyAlgo = when (keyPair.private) {
+            is ECKey -> "ECDSA"
+            is RSAKey -> "RSA"
+            else -> "ECDSA"
+        }
+        return "$digest${if (keyAlgo == "ECDSA") "withECDSA" else "withRSA"}"
     }
 
     private fun readByteArray(data: Parcel): ByteArray? {

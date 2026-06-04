@@ -41,14 +41,15 @@ object AttestationBuilder {
         securityLevel: Int,
     ): DERSequence {
         val ver = attestVersion()
-        Logger.d("Building KeyDescription ver=$ver securityLevel=$securityLevel algo=${params.algorithm}")
+        val kmVer = if (ver >= 100) ver else 41
+        Logger.d("Building KeyDescription ver=$ver kmVer=$kmVer securityLevel=$securityLevel algo=${params.algorithm}")
         val teeEnforced = buildTeeEnforcedList(params, uid, securityLevel, ver)
         val softwareEnforced = buildSoftwareEnforcedList(params, uid, securityLevel, ver)
 
         val fields = arrayOf(
             ASN1Integer(ver), // attestationVersion
             ASN1Enumerated(securityLevel), // attestationSecurityLevel
-            ASN1Integer(ver), // keyMintVersion
+            ASN1Integer(kmVer), // keyMintVersion
             ASN1Enumerated(securityLevel), // keymintSecurityLevel
             DEROctetString(params.attestationChallenge ?: ByteArray(0)),
             DEROctetString(ByteArray(0)), // uniqueId
