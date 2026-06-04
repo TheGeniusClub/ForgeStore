@@ -241,29 +241,59 @@ object AttestationBuilder {
 
     private fun getApplicationId(uid: Int): ByteArray {
         try {
-            val pmBinder = ServiceManager.getService("package") ?: return emptyAppId()
-            val pm = android.content.pm.IPackageManager.Stub.asInterface(pmBinder)
-            val packages = pm.getPackagesForUid(uid)?.toList() ?: return emptyAppId()
+            val pm = getPackageManager()
+            val packages = pm.getPackagesForUid(uid) ?: return emptyAppId()
+            val userId = uid / 100000
 
             val sha256 = MessageDigest.getInstance("SHA-256")
             val packageInfoList = mutableListOf<DERSequence>()
             val signatureDigests = mutableSetOf<DigestWrapper>()
 
             for (pkg in packages) {
+                val pi = try {
+                    getPackageInfoReflect(pm, pkg, userId)
+                } catch (_: Exception) { continue }
+
+                val pkgName = pi.packageName
+                val vc = pi.longVersionCode
+
                 packageInfoList.add(
                     DERSequence(arrayOf(
-                        DEROctetString(pkg.toByteArray(Charsets.UTF_8)),
-                        ASN1Integer(0L),
+                        DEROctetString(pkgName.toByteArray(Charsets.UTF_8)),
+                        ASN1Integer(vc),
                     ))
                 )
-                signatureDigests.add(DigestWrapper(sha256.digest(ByteArray(0))))
+
+                pi.signingInfo?.signingCertificateHistory?.forEach { sig ->
+                    signatureDigests.add(DigestWrapper(sha256.digest(sig.toByteArray())))
+                }
             }
+
+            if (packageInfoList.isEmpty()) return emptyAppId()
 
             return DERSequence(arrayOf(
                 DERSet(packageInfoList.toTypedArray()),
                 DERSet(signatureDigests.map { DEROctetString(it.digest) }.toTypedArray()),
             )).encoded
         } catch (_: Exception) { return emptyAppId() }
+    }
+
+    private fun getPackageInfoReflect(pm: android.content.pm.PackageManager, pkg: String, userId: Int): android.content.pm.PackageInfo {
+        val flags = android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES.toLong()
+        return try {
+            pm.javaClass.getMethod("getPackageInfo", String::class.java, java.lang.Long.TYPE, Int::class.javaPrimitiveType!!)
+                .invoke(pm, pkg, flags, userId) as android.content.pm.PackageInfo
+        } catch (_: Exception) {
+            pm.javaClass.getMethod("getPackageInfo", String::class.java, Int::class.javaPrimitiveType!!, Int::class.javaPrimitiveType!!)
+                .invoke(pm, pkg, flags.toInt(), userId) as android.content.pm.PackageInfo
+        }
+    }
+
+    private fun getPackageManager(): android.content.pm.PackageManager {
+        val atClass = Class.forName("android.app.ActivityThread")
+        val at = atClass.getMethod("systemMain").invoke(null)
+        val ctx = atClass.getMethod("getSystemContext").invoke(at) as android.content.Context
+        return ctx.packageManager
     }
 
     private fun emptyAppId(): ByteArray {
