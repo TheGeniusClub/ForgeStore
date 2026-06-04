@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Parcel
 import android.system.keystore2.Authorization
+import android.system.keystore2.CreateOperationResponse
 import android.system.keystore2.Domain
 import android.system.keystore2.IKeystoreSecurityLevel
 import android.system.keystore2.KeyDescriptor
@@ -80,12 +81,21 @@ class KeyMintInterceptor(
         reply: Parcel?,
         resultCode: Int,
     ): TransactionResult {
-        if (code != GENERATE_KEY_TRANSACTION || resultCode != 0 || reply == null) {
-            return TransactionResult.Skip
+        if (resultCode != 0 || reply == null) return TransactionResult.Skip
+
+        if (code == GENERATE_KEY_TRANSACTION) {
+            return handlePostGenerateKey(callingUid, reply)
         }
-        if (!ConfigManager.shouldPatch(callingUid)) {
-            return TransactionResult.Skip
+
+        if (code == CREATE_OPERATION_TRANSACTION) {
+            return handlePostCreateOperation(callingUid, data, reply, target)
         }
+
+        return TransactionResult.Skip
+    }
+
+    private fun handlePostGenerateKey(callingUid: Int, reply: Parcel): TransactionResult {
+        if (!ConfigManager.shouldPatch(callingUid)) return TransactionResult.Skip
 
         Logger.i("Post-transact patching cert chain for UID=$callingUid")
 
@@ -111,6 +121,31 @@ class KeyMintInterceptor(
             Logger.e("Post-transact patch failed", e)
             return TransactionResult.Skip
         }
+    }
+
+    private fun handlePostCreateOperation(uid: Int, data: Parcel, reply: Parcel, target: IBinder): TransactionResult {
+        try {
+            data.readInt()
+            data.readString()
+            data.readTypedObject(KeyDescriptor.CREATOR)
+            data.createTypedArray(KeyParameter.CREATOR)
+            data.readBoolean()
+
+            reply.readException()
+            val response = reply.readTypedObject(CreateOperationResponse.CREATOR) ?: return TransactionResult.Skip
+
+            response.iOperation?.let { op ->
+                val opBinder = op.asBinder()
+                val backdoor = BinderInterceptor.getBackdoor(target) ?: return@let
+                OperationInterceptor.gBackdoorBinder = backdoor
+                val interceptor = OperationInterceptor()
+                BinderInterceptor.register(backdoor, opBinder, interceptor)
+                Logger.i("Registered OperationInterceptor for UID=$uid")
+            }
+        } catch (e: Exception) {
+            Logger.e("Post createOperation failed", e)
+        }
+        return TransactionResult.Skip
     }
 
     private fun handleCreateOperation(
