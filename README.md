@@ -12,14 +12,13 @@ Work dir: `/data/adb/forgemint/`
 
 ### target.txt
 
-Each line: a key-value pair.
+Each line: package name with mode suffix.
 
 ```
-<package> <mode>
+<package>!     → generate mode (software key + cert)
+<package>?     → patch mode (hardware key + cert replace)
+<package>      → auto mode (tee?patch:generate)
 ```
-
-`package` — app package name
-`mode` — `generate`, `patch`, or empty for auto-detect
 
 ## Credits
 
