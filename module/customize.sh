@@ -44,5 +44,4 @@ mkdir -p "$DATA_DIR"
     dd if=/dev/random of="$DATA_DIR/hbk" bs=32 count=1 2>/dev/null
     ui_print "  Generated HBK seed"
 }
-[ ! -f "$DATA_DIR/target.txt" ] && cp "$MODPATH/target.txt" "$DATA_DIR/target.txt" 2>/dev/null
 true
