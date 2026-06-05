@@ -25,6 +25,28 @@ object StateManager {
 
     private val cache = ConcurrentHashMap<String, KeyEntry>()
     private val patchedChains = ConcurrentHashMap<KeyIdentifier, Array<Certificate>>()
+    private val activeOpsByUid = ConcurrentHashMap<Int, java.util.LinkedList<Long>>()
+
+    private const val MAX_OPS_PER_UID = 15
+
+    fun tryAcquireOperation(uid: Int, opId: Long): Boolean {
+        val list = activeOpsByUid.getOrPut(uid) { java.util.LinkedList() }
+        synchronized(list) {
+            list.removeIf { it < System.currentTimeMillis() - 30_000 }
+            if (list.size >= MAX_OPS_PER_UID) {
+                Logger.w("LRU: UID=$uid has ${list.size} active ops, rejecting op=$opId")
+                return false
+            }
+            list.add(opId)
+            return true
+        }
+    }
+
+    fun releaseOperation(uid: Int, opId: Long) {
+        activeOpsByUid[uid]?.let { list ->
+            synchronized(list) { list.remove(opId) }
+        }
+    }
 
     fun store(entry: KeyEntry) {
         cache[key(entry.uid, entry.alias)] = entry
@@ -55,6 +77,7 @@ object StateManager {
         val count = cache.size
         cache.clear()
         patchedChains.clear()
+        activeOpsByUid.clear()
         Logger.i("Cleared all state ($count entries)")
     }
 

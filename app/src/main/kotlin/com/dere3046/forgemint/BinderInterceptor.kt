@@ -38,6 +38,9 @@ open class BinderInterceptor : Binder() {
     ): TransactionResult = TransactionResult.Skip
 
     override fun onTransact(code: Int, data: Parcel, reply: Parcel?, flags: Int): Boolean {
+        if (isSystemTransaction(code)) {
+            return super.onTransact(code, data, reply, flags)
+        }
         val txId = data.readLong()
         return when (code) {
             PRE_CODE -> handlePreTransact(txId, data, reply)
@@ -52,6 +55,7 @@ open class BinderInterceptor : Binder() {
             val target = data.readStrongBinder()
             val pos1 = data.dataPosition()
             val txCode = data.readInt()
+            if (isSystemTransaction(txCode)) return true
             val txFlags = data.readInt()
             val callingUid = data.readInt()
             val callingPid = data.readInt()
@@ -151,6 +155,10 @@ open class BinderInterceptor : Binder() {
         const val ACTION_OVERRIDE_REPLY = 2
         const val ACTION_SKIP_POST = 3
         const val ACTION_OVERRIDE_DATA = 4
+
+        private const val FIRST_CALL_TRANSACTION = 1
+
+        fun isSystemTransaction(code: Int): Boolean = code < FIRST_CALL_TRANSACTION
 
         fun getBackdoor(binder: IBinder): IBinder? {
             val data = Parcel.obtain()

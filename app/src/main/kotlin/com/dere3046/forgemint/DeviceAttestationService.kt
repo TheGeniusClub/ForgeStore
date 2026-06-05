@@ -25,6 +25,7 @@ object DeviceAttestationService {
         val osPatchLevel: Int?,
         val vendorPatchLevel: Int?,
         val bootPatchLevel: Int?,
+        val cannotAttestIds: Boolean,
     )
 
     private const val TEE_CHECK_KEY_ALIAS = "ForgeMint_AttestationCheck"
@@ -142,10 +143,10 @@ object DeviceAttestationService {
             if (verifiedBootHash?.all { it == 0.toByte() } == true) verifiedBootHash = null
 
             Logger.i("Parsed TEE attestation: ver=$attestVersion os=$osVersion osPatch=$osPatchLevel")
-            AttestationData(moduleHash, verifiedBootKey, verifiedBootHash, attestVersion, keymasterVersion, osVersion, osPatchLevel, vendorPatchLevel, bootPatchLevel)
+            AttestationData(moduleHash, verifiedBootKey, verifiedBootHash, attestVersion, keymasterVersion, osVersion, osPatchLevel, vendorPatchLevel, bootPatchLevel, false)
         } catch (e: Exception) {
             Logger.e("Failed to parse TEE attestation data", e)
-            null
+            AttestationData(null, null, null, null, null, null, null, null, null, true)
         }
     }
 }

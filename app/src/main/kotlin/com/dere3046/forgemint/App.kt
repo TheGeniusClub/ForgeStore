@@ -20,12 +20,14 @@ object App {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        modDir = System.getProperty("moddir", "/data/adb/modules/forgemint")
+        modDir = System.getProperty("moddir") ?: "/data/adb/modules/forgemint"
         Logger.i("ForgeMint daemon starting (moddir=$modDir)")
 
         prepareEnvironment()
         setupProviders()
         ConfigManager.initialize()
+        BootStateManager.apply()
+        cleanupDiagnosticFiles()
         initBootProperties()
 
         while (true) {
@@ -200,5 +202,17 @@ object App {
         } catch (e: Exception) {
             Logger.w("AndroidKeyStoreProvider install skipped: ${e.message}")
         }
+    }
+
+    private fun cleanupDiagnosticFiles() {
+        try {
+            val tmpDir = java.io.File("/data/local/tmp")
+            tmpDir.listFiles()?.filter {
+                it.name.startsWith("forge-") && it.extension == "bin"
+            }?.forEach {
+                it.delete()
+                Logger.d("Cleaned up leftover: ${it.name}")
+            }
+        } catch (_: Exception) {}
     }
 }

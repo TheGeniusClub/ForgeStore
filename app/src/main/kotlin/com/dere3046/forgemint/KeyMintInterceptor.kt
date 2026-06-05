@@ -203,7 +203,7 @@ class KeyMintInterceptor(
 
             Logger.i("createOperation for generated key alias=${entry.alias} nspace=${keyDescriptor.nspace}")
 
-            val operation = SoftwareOperation(txId, entry.keyPair, parsedParams)
+            val operation = SoftwareOperation(txId, entry.keyPair, parsedParams, securityLevel)
             val binder = SoftwareOperationBinder(operation)
             val response = android.system.keystore2.CreateOperationResponse().apply {
                 iOperation = binder
@@ -247,27 +247,27 @@ class KeyMintInterceptor(
             })
         }
 
-        addAuth(Tag.ALGORITHM, securityLevel) { algorithm = params.algorithm }
         for (p in params.purpose) {
             addAuth(Tag.PURPOSE, securityLevel) { keyPurpose = p }
         }
+        addAuth(Tag.ALGORITHM, securityLevel) { algorithm = params.algorithm }
         if (params.keySize > 0) {
             addAuth(Tag.KEY_SIZE, securityLevel) { integer = params.keySize }
         }
         if (params.ecCurve != null) {
             addAuth(Tag.EC_CURVE, securityLevel) { ecCurve = params.ecCurve }
         }
-        if (params.rsaPublicExponent != null) {
-            addAuth(Tag.RSA_PUBLIC_EXPONENT, securityLevel) { longInteger = params.rsaPublicExponent.toLong() }
+        for (m in params.blockMode) {
+            addAuth(Tag.BLOCK_MODE, securityLevel) { blockMode = m }
         }
         for (d in params.digest) {
             addAuth(Tag.DIGEST, securityLevel) { digest = d }
         }
-        for (m in params.blockMode) {
-            addAuth(Tag.BLOCK_MODE, securityLevel) { blockMode = m }
-        }
         for (p in params.padding) {
             addAuth(Tag.PADDING, securityLevel) { paddingMode = p }
+        }
+        if (params.rsaPublicExponent != null) {
+            addAuth(Tag.RSA_PUBLIC_EXPONENT, securityLevel) { longInteger = params.rsaPublicExponent.toLong() }
         }
         if (params.noAuthRequired != null) {
             addAuth(Tag.NO_AUTH_REQUIRED, securityLevel) { boolValue = params.noAuthRequired }
@@ -275,8 +275,7 @@ class KeyMintInterceptor(
         addAuth(Tag.ORIGIN, securityLevel) { origin = params.origin ?: KeyOrigin.GENERATED }
         addAuth(Tag.OS_VERSION, securityLevel) { integer = AttestationBuilder.osVersion }
         addAuth(Tag.OS_PATCHLEVEL, securityLevel) { integer = AttestationBuilder.getPatchLevel(callingUid) }
-        addAuth(Tag.VENDOR_PATCHLEVEL, securityLevel) { integer = AttestationBuilder.getPatchLevelLong(callingUid) }
-        addAuth(Tag.BOOT_PATCHLEVEL, securityLevel) { integer = AttestationBuilder.getPatchLevelLong(callingUid) }
+
         addAuth(Tag.CREATION_DATETIME, securityLevel) { dateTime = System.currentTimeMillis() }
         addAuth(Tag.USER_ID, SecurityLevel.SOFTWARE) { integer = callingUid / 100000 }
 
@@ -326,6 +325,8 @@ class KeyMintInterceptor(
         uid: Int,
     ): TransactionResult? {
         Logger.i("tryGenerateSoftwareKey algo=${params.algorithm} keySize=${params.keySize} ecCurve=${params.ecCurve} uid=$uid")
+
+        val startNanos = System.nanoTime()
 
         val keybox = KeyboxReader.loadKeybox(params.algorithm)
         if (keybox == null) {
@@ -399,6 +400,9 @@ class KeyMintInterceptor(
         val override = Parcel.obtain()
         override.writeNoException()
         override.writeTypedObject(metadata, 0)
+
+        TeeLatencySimulator.simulateGenerateKeyDelay(params.algorithm, securityLevel, System.nanoTime() - startNanos)
+
         return TransactionResult.OverrideReply(override)
     }
 }

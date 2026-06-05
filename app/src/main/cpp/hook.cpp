@@ -140,7 +140,12 @@ status_t BinderStub::onTransact(uint32_t code, const Parcel &data,
     pre_req.appendFrom(&data, 0, data.dataSize());
 
     status_t cb_status = OK;
-    if (callback->transact(PRE_CODE, pre_req, &pre_resp) == OK) {
+    if (callback != nullptr) {
+        status_t pre_result = callback->transact(PRE_CODE, pre_req, &pre_resp);
+        if (pre_result != OK) {
+            LOG("deadman: callback died (result=%d), blocking attestation leak", pre_result);
+            return DEAD_OBJECT;
+        }
         int32_t action = pre_resp.readInt32();
         if (action == ACTION_OVERRIDE_REPLY) {
             status_t result;

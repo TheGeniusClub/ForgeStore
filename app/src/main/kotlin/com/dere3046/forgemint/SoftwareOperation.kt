@@ -123,8 +123,16 @@ class SoftwareOperation(
     private val txId: Long,
     keyPair: KeyPair,
     params: KeyMintAttestation,
+    private val securityLevel: Int,
 ) {
     private val primitive: CryptoPrimitive
+
+    private val latencyFloorMs: Long = when (params.algorithm) {
+        android.hardware.security.keymint.Algorithm.EC -> 20L
+        android.hardware.security.keymint.Algorithm.RSA -> 70L
+        android.hardware.security.keymint.Algorithm.AES -> 35L
+        else -> 20L
+    }
 
     init {
         val purpose = params.purpose.firstOrNull() ?: throw UnsupportedOperationException("No purpose specified")
@@ -148,6 +156,7 @@ class SoftwareOperation(
     }
 
     fun finish(data: ByteArray?, signature: ByteArray?): ByteArray? {
+        val start = System.nanoTime()
         try {
             val result = primitive.finish(data, signature)
             Logger.i("SoftwareOperation finish txId=$txId OK")
@@ -155,12 +164,22 @@ class SoftwareOperation(
         } catch (e: Exception) {
             Logger.e("SoftwareOperation finish error txId=$txId", e)
             throw e
+        } finally {
+            applyLatency(start)
         }
     }
 
     fun abort() {
         primitive.abort()
         Logger.d("SoftwareOperation abort txId=$txId")
+    }
+
+    private fun applyLatency(startNanos: Long) {
+        val elapsedMs = (System.nanoTime() - startNanos) / 1_000_000L
+        val remainingMs = latencyFloorMs - elapsedMs
+        if (remainingMs > 1) {
+            Thread.sleep(remainingMs)
+        }
     }
 }
 
