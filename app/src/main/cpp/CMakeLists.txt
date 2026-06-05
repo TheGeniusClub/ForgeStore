@@ -72,5 +72,9 @@ target_include_directories(libinject.so PRIVATE .)
 target_link_libraries(libinject.so log dl)
 target_compile_options(libinject.so PRIVATE -Wall -Wextra -Wno-unused-parameter)
 
+add_executable(updaemon updaemon.cpp)
+target_compile_options(updaemon PRIVATE -Wall -Wextra -Wno-unused-parameter)
+set_target_properties(updaemon PROPERTIES OUTPUT_NAME updaemon)
+
 add_library(forgemint_kmsg SHARED kmsg.c)
 target_compile_options(forgemint_kmsg PRIVATE -Wall -Wextra -Wno-unused-parameter)
