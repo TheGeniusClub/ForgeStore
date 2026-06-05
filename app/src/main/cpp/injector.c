@@ -360,7 +360,10 @@ static int do_inject(int pid, const char *lib_path)
             info.library_fd = fd;
             uintptr_t info_addr = push_memory(pid, &regs, &info, sizeof(info));
             if (info_addr) {
-                uintptr_t path_addr = push_memory(pid, &regs, lib_path, strlen(lib_path) + 1);
+                char fake[16]; gen_rand(fake, 8);
+                char fd_path[32];
+                snprintf(fd_path, sizeof(fd_path), "/lib%s.so", fake);
+                uintptr_t path_addr = push_memory(pid, &regs, fd_path, strlen(fd_path) + 1);
                 if (!path_addr) { LOG("push path failed"); return -1; }
                 uintptr_t args[] = {path_addr, RTLD_NOW, info_addr};
                 handle = remote_call(pid, &regs, a_dext, ret_addr, 3, args);
