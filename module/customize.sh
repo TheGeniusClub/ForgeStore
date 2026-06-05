@@ -36,3 +36,13 @@ set_perm "$MODPATH/lib/libinject.so" 0 0 0755
 set_perm "$MODPATH/service.apk" 0 0 0644
 set_perm "$MODPATH/daemon" 0 0 0755
 set_perm "$MODPATH/service.sh" 0 0 0755
+
+ui_print "- Setting up config directory"
+DATA_DIR="/data/adb/forgemint"
+mkdir -p "$DATA_DIR"
+[ ! -f "$DATA_DIR/hbk" ] && {
+    dd if=/dev/random of="$DATA_DIR/hbk" bs=32 count=1 2>/dev/null
+    ui_print "  Generated HBK seed"
+}
+[ ! -f "$DATA_DIR/target.txt" ] && cp "$MODPATH/target.txt" "$DATA_DIR/target.txt" 2>/dev/null
+true

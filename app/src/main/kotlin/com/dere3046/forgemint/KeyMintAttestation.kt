@@ -37,6 +37,7 @@ data class KeyMintAttestation(
     val manufacturer: ByteArray?,
     val model: ByteArray?,
     val secondImei: ByteArray?,
+    val includeUniqueId: Boolean?,
 ) {
     constructor(params: Array<KeyParameter>) : this(
         algorithm = params.findAlgorithm(Tag.ALGORITHM) ?: 0,
@@ -64,6 +65,7 @@ data class KeyMintAttestation(
         manufacturer = params.findBlob(Tag.ATTESTATION_ID_MANUFACTURER),
         model = params.findBlob(Tag.ATTESTATION_ID_MODEL),
         secondImei = params.findBlob(Tag.ATTESTATION_ID_SECOND_IMEI),
+        includeUniqueId = params.findBoolean(Tag.INCLUDE_UNIQUE_ID),
     )
 
     val isAttestKey: Boolean

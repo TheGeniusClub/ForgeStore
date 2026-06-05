@@ -13,6 +13,10 @@ import org.bouncycastle.asn1.DERSequence
 import org.bouncycastle.asn1.DERSet
 import org.bouncycastle.asn1.DERTaggedObject
 import java.security.MessageDigest
+import java.security.SecureRandom
+import java.nio.ByteBuffer
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 object AttestationBuilder {
 
@@ -145,6 +149,13 @@ object AttestationBuilder {
         val kmVer = getKeymasterVersion(securityLevel)
         val teeEnforced = buildTeeEnforcedList(params, uid, securityLevel)
         val softwareEnforced = buildSoftwareEnforcedList(params, uid, securityLevel)
+        val creationTime = System.currentTimeMillis()
+
+        val uniqueId = if (params.includeUniqueId == true && params.attestationChallenge != null) {
+            computeUniqueId(creationTime, getApplicationId(uid))
+        } else {
+            ByteArray(0)
+        }
 
         val fields = arrayOf(
             ASN1Integer(ver.toLong()),
@@ -152,11 +163,33 @@ object AttestationBuilder {
             ASN1Integer(kmVer.toLong()),
             ASN1Enumerated(securityLevel),
             DEROctetString(params.attestationChallenge ?: ByteArray(0)),
-            DEROctetString(ByteArray(0)),
+            DEROctetString(uniqueId),
             softwareEnforced,
             teeEnforced,
         )
         return DERSequence(fields)
+    }
+
+    private val hbk: ByteArray by lazy {
+        val file = java.io.File("/data/adb/forgemint", "hbk")
+        if (file.exists() && file.length() == 32L) {
+            file.readBytes()
+        } else {
+            Logger.w("hbk not found, generating ephemeral HBK")
+            ByteArray(32).also { SecureRandom().nextBytes(it) }
+        }
+    }
+
+    private fun computeUniqueId(creationTimeMs: Long, aaidDer: ByteArray): ByteArray {
+        val temporalCounter = creationTimeMs / 2592000000L
+        val message = ByteBuffer.allocate(8 + aaidDer.size + 1)
+            .putLong(temporalCounter)
+            .put(aaidDer)
+            .put(0x00.toByte())
+            .array()
+        val mac = Mac.getInstance("HmacSHA256")
+        mac.init(SecretKeySpec(hbk, "HmacSHA256"))
+        return mac.doFinal(message).copyOf(16)
     }
 
     private fun buildTeeEnforcedList(
