@@ -281,7 +281,7 @@ class KeyMintInterceptor(
         addAuth(Tag.OS_VERSION, securityLevel) { integer = AttestationBuilder.osVersion }
         addAuth(Tag.OS_PATCHLEVEL, securityLevel) { integer = AttestationBuilder.getPatchLevel(callingUid) }
 
-        addAuth(Tag.CREATION_DATETIME, securityLevel) { dateTime = System.currentTimeMillis() }
+        addAuth(Tag.CREATION_DATETIME, SecurityLevel.KEYSTORE) { dateTime = System.currentTimeMillis() }
         addAuth(Tag.USER_ID, SecurityLevel.SOFTWARE) { integer = callingUid / 100000 }
 
         return list.toTypedArray()
