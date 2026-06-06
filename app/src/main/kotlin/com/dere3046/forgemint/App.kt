@@ -45,8 +45,9 @@ object App {
     fun main(args: Array<String>) {
         modDir = System.getProperty("moddir") ?: "/data/adb/modules/forgemint"
 
-        val debugFile = java.io.File("/data/adb/forgemint/debug")
-        Logger.setMode(debugFile.exists())
+        ConfigManager.initConfig()
+        Logger.setMode(ConfigManager.isDebugEnabled)
+        Logger.verbose = ConfigManager.isVerboseLog
         Logger.i("ForgeMint daemon starting (moddir=$modDir, sdk=${Build.VERSION.SDK_INT}, mode=${if (Logger.useLogcat) "logcat" else "kmsg"})")
         prepareEnvironment()
         setupProviders()

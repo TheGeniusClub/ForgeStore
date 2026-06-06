@@ -59,4 +59,13 @@ mkdir -p "$DATA_DIR"
     dd if=/dev/random of="$DATA_DIR/hbk" bs=32 count=1 2>/dev/null
     ui_print "  Generated HBK seed"
 }
+[ ! -f "$DATA_DIR/config" ] && {
+    cat > "$DATA_DIR/config" << 'EOF'
+debug=false
+verbose_log=false
+fallback=true
+whitelist_mode=false
+EOF
+    ui_print "  Created default config"
+}
 true

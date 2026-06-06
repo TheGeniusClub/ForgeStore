@@ -38,6 +38,15 @@ object ConfigManager {
     private const val TEE_STATUS_FILE = "tee_status.txt"
     private const val PATCH_FILE = "security_patch.txt"
     private const val KEYBOX_FILE = "keybox.xml"
+    private const val CONFIG_FILE = "config"
+
+    private val configDefaults = mapOf(
+        "debug" to false,
+        "verbose_log" to false,
+        "fallback" to true,
+        "whitelist_mode" to false,
+    )
+    private val configMap = ConcurrentHashMap<String, Boolean>()
 
     private val configRoot = File(CONFIG_DIR)
     private val targetFile = File(configRoot, TARGET_FILE)
@@ -52,8 +61,14 @@ object ConfigManager {
 
     private var observer: FileObserver? = null
 
+    fun initConfig() {
+        configRoot.mkdirs()
+        loadConfig()
+    }
+
     fun initialize() {
         configRoot.mkdirs()
+        loadConfig()
         Logger.i("Config root: ${configRoot.absolutePath}")
         loadTargetPackages()
         loadSecurityPatchLevels()
@@ -62,13 +77,44 @@ object ConfigManager {
         Logger.i("Config initialized: ${packageModes.size} packages, global patch level: ${globalPatchLevel != null}")
     }
 
+    private fun loadConfig() {
+        configDefaults.entries.forEach { configMap.put(it.key, it.value) }
+        val configFile = File(configRoot, CONFIG_FILE)
+        if (!configFile.exists()) return
+        try {
+            for (line in configFile.readLines()) {
+                val trimmed = line.trim()
+                if (trimmed.isEmpty() || trimmed.startsWith("#")) continue
+                val eqIdx = trimmed.indexOf('=')
+                if (eqIdx < 0) continue
+                val key = trimmed.substring(0, eqIdx).trim()
+                val value = trimmed.substring(eqIdx + 1).trim()
+                if (key in configDefaults) {
+                    configMap[key] = value == "true"
+                }
+            }
+        } catch (e: Exception) {
+            Logger.e("Failed to load config", e)
+        }
+    }
+
+    private fun getBool(key: String): Boolean = configMap[key] ?: configDefaults[key] ?: false
+
+    val isDebugEnabled: Boolean get() = getBool("debug")
+    val isVerboseLog: Boolean get() = getBool("verbose_log")
+    val isFallbackEnabled: Boolean get() = getBool("fallback")
+    val isWhitelistMode: Boolean get() = getBool("whitelist_mode")
+
     fun shouldGenerate(uid: Int): Boolean = getModeForUid(uid) == Mode.GENERATE ||
             (getModeForUid(uid) == Mode.AUTO && isTeBroken == true)
 
     fun shouldPatch(uid: Int): Boolean = getModeForUid(uid) == Mode.PATCH ||
             (getModeForUid(uid) == Mode.AUTO && isTeBroken != true)
 
-    fun shouldSkip(uid: Int): Boolean = getModeForUid(uid) == null
+    fun shouldSkip(uid: Int): Boolean {
+        val hasMode = getModeForUid(uid) != null
+        return if (isWhitelistMode) hasMode else !hasMode
+    }
 
     fun getPatchLevelForUid(uid: Int): CustomPatchLevel? = globalPatchLevel
 
@@ -214,6 +260,10 @@ object ConfigManager {
                     Logger.i("keybox.xml changed, clearing caches")
                     KeyboxReader.clearCache()
                     StateManager.clearAll()
+                }
+                if (path == CONFIG_FILE) {
+                    Logger.i("config changed, reloading")
+                    loadConfig()
                 }
             }
         }.apply { startWatching() }

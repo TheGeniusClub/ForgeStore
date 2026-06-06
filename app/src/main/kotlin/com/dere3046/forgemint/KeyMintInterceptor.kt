@@ -485,12 +485,12 @@ class KeyMintInterceptor(
                     keyPair, keybox, params, uid, securityLevel,
                     signerKeyPair, attestKeyCert,
                 )
-            keybox != null -> {
+            keybox != null && ConfigManager.isFallbackEnabled -> {
                 Logger.w("keybox configured but certificates empty, using self-signed fallback for UID=$uid")
                 CertificateBuilder.generateFallbackChain(keyPair, params, uid, securityLevel)
             }
             else -> {
-                Logger.w("no keybox configured, falling back to HAL for UID=$uid")
+                Logger.w("no keybox configured or fallback disabled, falling back to HAL for UID=$uid")
                 null
             }
         }

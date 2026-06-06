@@ -23,6 +23,7 @@ object Logger {
     private const val TAG = "ForgeMint"
 
     @Volatile var useLogcat = false
+    @Volatile var verbose = false
 
     fun setMode(debugMode: Boolean) {
         useLogcat = debugMode
@@ -63,8 +64,8 @@ object Logger {
         }
     }
 
-    fun d(msg: String) = logd(msg)
-    fun i(msg: String) = logi(msg)
+    fun d(msg: String) { if (verbose) logd(msg) }
+    fun i(msg: String) { if (verbose) logi(msg) }
     fun w(msg: String) = logw(msg)
     fun w(msg: String, t: Throwable) = Log.w(TAG, msg, t)
     fun e(msg: String, t: Throwable? = null) {
