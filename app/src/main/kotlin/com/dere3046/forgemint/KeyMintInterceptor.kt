@@ -88,20 +88,18 @@ class KeyMintInterceptor(
 
         Logger.d("generateKey UID=$callingUid")
 
-        val teeBroken = ConfigManager.isTeeBroken()
-        if (!teeBroken && ConfigManager.shouldSkip(callingUid)) {
+        if (ConfigManager.shouldSkip(callingUid)) {
             return TransactionResult.ContinueAndSkipPost
         }
 
         val genParams = parseParams(data) ?: return TransactionResult.Continue
         val params = genParams.attestation
 
-        if (!teeBroken && ConfigManager.shouldSkip(callingUid) && !params.isAttestKey) {
+        if (ConfigManager.shouldSkip(callingUid) && !params.isAttestKey) {
             return TransactionResult.ContinueAndSkipPost
         }
 
-        val needsSoftwareGen = teeBroken ||
-            params.isAttestKey ||
+        val needsSoftwareGen = params.isAttestKey ||
             ConfigManager.shouldGenerate(callingUid) ||
             (ConfigManager.shouldPatch(callingUid) && params.isAttestKey) ||
             (genParams.attestationKeyDescriptor != null && isKnownAttestationKey(callingUid, genParams.attestationKeyDescriptor))

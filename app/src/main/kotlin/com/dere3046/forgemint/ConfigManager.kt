@@ -56,7 +56,6 @@ object ConfigManager {
 
     @Volatile private var packageModes = mapOf<String, Mode>()
     @Volatile private var isTeBroken: Boolean? = null
-    fun isTeeBroken(): Boolean = isTeBroken == true
     @Volatile private var globalPatchLevel: CustomPatchLevel? = null
     private val uidPackageCache = ConcurrentHashMap<Int, List<String>>()
 
@@ -106,11 +105,9 @@ object ConfigManager {
     val isFallbackEnabled: Boolean get() = getBool("fallback")
     val isWhitelistMode: Boolean get() = getBool("whitelist_mode")
 
-    fun shouldGenerate(uid: Int): Boolean = getModeForUid(uid) == Mode.GENERATE ||
-            (getModeForUid(uid) == Mode.AUTO && isTeBroken == true)
+    fun shouldGenerate(uid: Int): Boolean = getModeForUid(uid) == Mode.GENERATE
 
-    fun shouldPatch(uid: Int): Boolean = getModeForUid(uid) == Mode.PATCH ||
-            (getModeForUid(uid) == Mode.AUTO && isTeBroken != true)
+    fun shouldPatch(uid: Int): Boolean = getModeForUid(uid) == Mode.PATCH
 
     fun shouldSkip(uid: Int): Boolean {
         val hasMode = getModeForUid(uid) != null
@@ -137,7 +134,12 @@ object ConfigManager {
         if (packages.isEmpty()) return null
         if (isTeBroken == null) loadTeeStatus()
         for (pkg in packages) {
-            packageModes[pkg]?.let { return it }
+            packageModes[pkg]?.let { mode ->
+                return when (mode) {
+                    Mode.AUTO -> if (isTeBroken == true) Mode.GENERATE else Mode.PATCH
+                    else -> mode
+                }
+            }
         }
         return null
     }
