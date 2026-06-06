@@ -419,7 +419,8 @@ static int do_inject(int pid, const char *lib_path)
         }
     }
 
-    /* Fallback: path-based dlopen */
+#if 0
+    /* Fallback: path-based dlopen — requires keystore module execute permission, removed for security */
     if (handle == 0) {
         uintptr_t dl_f = find_func_addr(pid, "libdl.so", "dlopen");
         if (!dl_f) dl_f = find_func_addr(pid, "linker64", "dlopen");
@@ -445,6 +446,7 @@ static int do_inject(int pid, const char *lib_path)
             }
         }
     }
+#endif
 
     set_regs(pid, &backup);
     return handle > 0 && handle != (uintptr_t)-1 ? 0 : -1;

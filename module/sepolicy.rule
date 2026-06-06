@@ -1,2 +1,1 @@
 allow crash_dump keystore process *
-allow keystore module_data_file file { execute }
