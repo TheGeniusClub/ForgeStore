@@ -66,7 +66,7 @@ class KeyMintInterceptor(
             return TransactionResult.ContinueAndSkipPost
         }
 
-        Logger.i("generateKey UID=$callingUid")
+        Logger.d("generateKey UID=$callingUid")
 
         if (ConfigManager.shouldSkip(callingUid)) {
             return TransactionResult.ContinueAndSkipPost
@@ -94,11 +94,11 @@ class KeyMintInterceptor(
         }
 
         if (ConfigManager.shouldPatch(callingUid) && params.attestationChallenge != null) {
-            Logger.i("Forwarding to HAL for PATCH mode")
+            Logger.d("Forwarding to HAL for PATCH mode")
             return TransactionResult.Continue
         }
 
-        Logger.i("generateKey: no handler matched (shouldGenerate=${ConfigManager.shouldGenerate(callingUid)} shouldPatch=${ConfigManager.shouldPatch(callingUid)} isAttestKey=${params.isAttestKey} hasChallenge=${params.attestationChallenge != null}), forwarding to HAL for post-transact cache")
+        Logger.w("generateKey: no handler matched (shouldGenerate=${ConfigManager.shouldGenerate(callingUid)} shouldPatch=${ConfigManager.shouldPatch(callingUid)} isAttestKey=${params.isAttestKey} hasChallenge=${params.attestationChallenge != null}), forwarding to HAL for post-transact cache")
         return TransactionResult.Continue
     }
 
@@ -155,7 +155,7 @@ class KeyMintInterceptor(
                 return TransactionResult.Skip
             }
 
-            Logger.i("PATCH mode post-generateKey for UID=$callingUid")
+            Logger.d("PATCH mode post-generateKey for UID=$callingUid")
             val patchedChain = AttestationPatcher.patchCertificateChain(originalChain, callingUid)
 
             StateManager.cachePatchedChain(keyId, patchedChain)
@@ -194,7 +194,7 @@ class KeyMintInterceptor(
                 Logger.w("Post createOperation: response is null for UID=$uid keyDesc.alias=${keyDesc?.alias} keyDesc.nspace=${keyDesc?.nspace}")
                 return TransactionResult.Skip
             }
-            Logger.i("Post createOperation: UID=$uid operationChallenge=${response.operationChallenge != null} iOperation=${response.iOperation != null}")
+            Logger.d("Post createOperation: UID=$uid operationChallenge=${response.operationChallenge != null} iOperation=${response.iOperation != null}")
 
             response.iOperation?.let { op ->
                 val opBinder = op.asBinder()
@@ -215,7 +215,7 @@ class KeyMintInterceptor(
             val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Skip
             val alias = keyDescriptor.alias
             if (alias != null && StateManager.lookup(uid, alias) != null) {
-                Logger.i("importKey alias=$alias UID=$uid → cleaning up generated key")
+                Logger.d("importKey alias=$alias UID=$uid → cleaning up generated key")
                 StateManager.remove(uid, alias)
             }
         } catch (_: Exception) {}
@@ -256,7 +256,7 @@ class KeyMintInterceptor(
                 return replyKeymintError(authResult.errorCode ?: -1000) ?: TransactionResult.Skip
             }
 
-            Logger.i("createOperation for generated key alias=${entry.alias} nspace=${keyDescriptor.nspace} algo=${parsedParams.algorithm} purpose=${parsedParams.purpose.firstOrNull()}")
+            Logger.d("createOperation for generated key alias=${entry.alias} nspace=${keyDescriptor.nspace} algo=${parsedParams.algorithm} purpose=${parsedParams.purpose.firstOrNull()}")
 
             val operation = SoftwareOperation(txId, entry.keyPair, entry.secretKey, parsedParams, securityLevel, uid)
             StateManager.acquireOp(uid, operation)
@@ -421,7 +421,7 @@ class KeyMintInterceptor(
             val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR)
             val alias = keyDescriptor?.alias
             if (alias != null) {
-                Logger.i("importKey alias=$alias UID=$uid → forwarding to HAL, will cleanup on success")
+                Logger.d("importKey alias=$alias UID=$uid → forwarding to HAL, will cleanup on success")
             }
         } catch (_: Exception) {}
         return TransactionResult.Continue
@@ -433,7 +433,7 @@ class KeyMintInterceptor(
         attestKeyDescriptor: KeyDescriptor?,
         uid: Int,
     ): TransactionResult? {
-        Logger.i("tryGenerateSoftwareKey algo=${params.algorithm} keySize=${params.keySize} ecCurve=${params.ecCurve} uid=$uid")
+        Logger.d("tryGenerateSoftwareKey algo=${params.algorithm} keySize=${params.keySize} ecCurve=${params.ecCurve} uid=$uid")
 
         val startNanos = System.nanoTime()
 
@@ -550,7 +550,7 @@ class KeyMintInterceptor(
         uid: Int,
         startNanos: Long,
     ): TransactionResult? {
-        Logger.i("tryGenerateAttestKey algo=${params.algorithm} uid=$uid")
+        Logger.d("tryGenerateAttestKey algo=${params.algorithm} uid=$uid")
 
         val keyPair = CertificateBuilder.generateKeyPair(params)
         if (keyPair == null) {
@@ -607,7 +607,7 @@ class KeyMintInterceptor(
         uid: Int,
         startNanos: Long,
     ): TransactionResult? {
-        Logger.i("tryGenerateSymmetricKey algo=${params.algorithm} keySize=${params.keySize} uid=$uid")
+        Logger.d("tryGenerateSymmetricKey algo=${params.algorithm} keySize=${params.keySize} uid=$uid")
 
         val algoName = when (params.algorithm) {
             android.hardware.security.keymint.Algorithm.AES -> "AES"

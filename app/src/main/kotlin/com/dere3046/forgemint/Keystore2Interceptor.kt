@@ -81,7 +81,7 @@ class Keystore2Interceptor : BinderInterceptor() {
 
             entry.metadata.certificate = publicCert
             entry.metadata.certificateChain = certificateChain
-            Logger.i("updateSubcomponent nspace=${entry.nspace} cert=${publicCert?.size} chain=${certificateChain?.size}")
+            Logger.d("updateSubcomponent nspace=${entry.nspace} cert=${publicCert?.size} chain=${certificateChain?.size}")
 
             val reply = Parcel.obtain()
             reply.writeNoException()
@@ -281,7 +281,7 @@ class Keystore2Interceptor : BinderInterceptor() {
             if (alias == null) return TransactionResult.Continue
 
             if (StateManager.lookup(uid, alias) != null) {
-                Logger.i("deleteKey alias=$alias UID=$uid → cleaning up")
+                Logger.d("deleteKey alias=$alias UID=$uid → cleaning up")
                 StateManager.remove(uid, alias)
                 val reply = Parcel.obtain()
                 reply.writeNoException()
@@ -332,12 +332,12 @@ class Keystore2Interceptor : BinderInterceptor() {
                     Logger.d("getKeyEntry POST: using cached patched chain for alias=${keyDescriptor.alias}")
                     patchedChain = cached
                 } else {
-                    Logger.i("getKeyEntry POST: live patching chain for alias=${keyDescriptor.alias}")
+                    Logger.d("getKeyEntry POST: live patching chain for alias=${keyDescriptor.alias}")
                     patchedChain = AttestationPatcher.patchCertificateChain(originalChain, uid)
                     StateManager.cachePatchedChain(keyId, patchedChain)
                 }
             } else {
-                Logger.i("getKeyEntry POST: live patching chain (anonymous descriptor)")
+                Logger.d("getKeyEntry POST: live patching chain (anonymous descriptor)")
                 patchedChain = AttestationPatcher.patchCertificateChain(originalChain, uid)
             }
 
@@ -355,7 +355,7 @@ class Keystore2Interceptor : BinderInterceptor() {
     }
 
     private fun handleAttestKeyOverride(uid: Int, keyDescriptor: KeyDescriptor, response: KeyEntryResponse, params: KeyMintAttestation): TransactionResult {
-        Logger.i("getKeyEntry POST: overriding hardware attest key alias=${keyDescriptor.alias}")
+        Logger.d("getKeyEntry POST: overriding hardware attest key alias=${keyDescriptor.alias}")
 
         val keybox = KeyboxReader.loadKeybox(params.algorithm) ?: return TransactionResult.Skip
         if (keybox.certificates.isEmpty()) return TransactionResult.Skip
@@ -385,7 +385,7 @@ class Keystore2Interceptor : BinderInterceptor() {
             certChain = chain.map { it as java.security.cert.X509Certificate },
         )
         StateManager.store(entry)
-        Logger.i("Stored attest key override alias=$alias nspace=${key.nspace}")
+        Logger.d("Stored attest key override alias=$alias nspace=${key.nspace}")
 
         val override = Parcel.obtain()
         override.writeNoException()
@@ -425,7 +425,7 @@ class Keystore2Interceptor : BinderInterceptor() {
             }
 
             val result = existing.values.toTypedArray()
-            Logger.i("listEntries injected ${generated.size} keys for UID=$uid startPastAlias=$startPastAlias (total=${existing.size})")
+            Logger.d("listEntries injected ${generated.size} keys for UID=$uid startPastAlias=$startPastAlias (total=${existing.size})")
 
             val override = Parcel.obtain()
             override.writeNoException()

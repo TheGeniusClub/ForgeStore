@@ -92,7 +92,7 @@ object StateManager {
         while (ops.size >= MAX_OPS_PER_UID) {
             val oldest = ops.pollFirst() ?: break
             if (!oldest.finalized) {
-                Logger.i("LRU: aborting oldest unfinished op for uid=$uid")
+                Logger.w("LRU: aborting oldest unfinished op for uid=$uid")
                 oldest.abort()
             }
         }
@@ -192,7 +192,7 @@ object StateManager {
             ))
             count++
         }
-        if (count > 0) Logger.i("Loaded $count persisted keys")
+        if (count > 0) Logger.d("Loaded $count persisted keys")
     }
 
     fun listForUid(uid: Int): List<KeyEntry> {
@@ -214,7 +214,7 @@ object StateManager {
         teeResponses.clear()
         grantMap.clear()
         activeOps.clear()
-        Logger.i("Cleared all state ($count entries)")
+        Logger.d("Cleared all state ($count entries)")
     }
 
     private fun key(uid: Int, alias: String) = "$uid:$alias"

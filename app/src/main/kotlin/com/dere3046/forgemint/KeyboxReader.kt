@@ -135,7 +135,7 @@ object KeyboxReader {
             event = parser.next()
         }
 
-        Logger.i("Parsed ${found.size} keys from keybox.xml")
+        Logger.d("Parsed ${found.size} keys from keybox.xml")
         return found
     }
 

@@ -182,7 +182,7 @@ object GeneratedKeyPersistence {
                         chain.add(cert)
                     }
 
-                    Logger.i("persist: loaded key $key (uid=$uid alias=$alias)")
+                    Logger.d("persist: loaded key $key (uid=$uid alias=$alias)")
                     return LoadedKey(uid, alias, nspace, secLevel, keyPair, secretKey, metadata, chain)
                 }
             } catch (e: Exception) {

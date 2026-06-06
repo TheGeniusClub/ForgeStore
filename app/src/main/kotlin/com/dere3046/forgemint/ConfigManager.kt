@@ -69,7 +69,7 @@ object ConfigManager {
     fun initialize() {
         configRoot.mkdirs()
         loadConfig()
-        Logger.i("Config root: ${configRoot.absolutePath}")
+        Logger.d("Config root: ${configRoot.absolutePath}")
         loadTargetPackages()
         loadSecurityPatchLevels()
         loadTeeStatus()
@@ -167,7 +167,7 @@ object ConfigManager {
             }
             packageModes = newModes
             uidPackageCache.clear()
-            Logger.i("Loaded ${newModes.size} package modes")
+            Logger.d("Loaded ${newModes.size} package modes")
         } catch (e: Exception) {
             Logger.e("Failed to load target.txt", e)
         }

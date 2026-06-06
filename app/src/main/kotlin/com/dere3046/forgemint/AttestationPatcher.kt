@@ -62,7 +62,7 @@ object AttestationPatcher {
             )
 
             val newChain = listOf(patchedLeaf) + keybox.certificates
-            Logger.i("Patched cert chain for UID $uid, chain size=${newChain.size}")
+            Logger.d("Patched cert chain for UID $uid, chain size=${newChain.size}")
             newChain.toTypedArray()
         }.getOrElse {
             Logger.e("Failed to patch certificate chain for UID $uid", it)

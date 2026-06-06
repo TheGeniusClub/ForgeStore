@@ -68,7 +68,7 @@ object App {
                     Logger.i("Interceptors registered, checking TEE status")
                     ConfigManager.checkTeeStatus()
                     DeviceAttestationService.cachedData
-                    Logger.i("TEE attestation cached=${DeviceAttestationService.cachedData != null}")
+                    Logger.d("TEE attestation cached=${DeviceAttestationService.cachedData != null}")
                     break
                 }
             } catch (e: Exception) {
@@ -122,7 +122,7 @@ object App {
         }
 
         if (!injectionAttempted) {
-            Logger.i("Backdoor not found, attempting injection")
+            Logger.w("Backdoor not found, attempting injection")
             injectionAttempted = true
             if (!performInjection()) {
                 Logger.w("Injection failed, will retry")
@@ -160,7 +160,7 @@ object App {
             }
 
             val cmd = arrayOf("$modDir/lib/libinject.so", pid, "$modDir/lib/libforgemint.so")
-            Logger.i("Running: $modDir/lib/libinject.so $pid $modDir/lib/libforgemint.so")
+            Logger.d("Running: $modDir/lib/libinject.so $pid $modDir/lib/libforgemint.so")
 
             val process = Runtime.getRuntime().exec(cmd)
             val exitCode = process.waitFor()
@@ -205,7 +205,7 @@ object App {
             Logger.e("Failed to get TEE SecurityLevel", e)
             error(e)
         }
-        Logger.i("Got IKeystoreSecurityLevel for TEE")
+        Logger.d("Got IKeystoreSecurityLevel for TEE")
         teeBinder.linkToDeath({ onServiceDeath() }, 0)
 
         val kmInterceptor = KeyMintInterceptor(teeBinder, SecurityLevel.TRUSTED_ENVIRONMENT)
@@ -218,12 +218,12 @@ object App {
             BinderInterceptor.register(backdoor, sbBinder, sbInterceptor)
             Logger.i("Registered KeyMintInterceptor for StrongBox")
         } catch (_: Exception) {
-            Logger.i("StrongBox not available, skipping")
+            Logger.w("StrongBox not available, skipping")
         }
     }
 
     private fun onServiceDeath() {
-        Logger.i("Keystore service died, restarting daemon")
+        Logger.w("Keystore service died, restarting daemon")
         kotlin.system.exitProcess(0)
     }
 

@@ -105,7 +105,7 @@ class KeystoreInterceptor(
 
             when {
                 alias.startsWith(Credentials.USER_CERTIFICATE) -> {
-                    Logger.i("K1 postTr: patch leaf cert alias=$extractedAlias")
+                    Logger.d("K1 postTr: patch leaf cert alias=$extractedAlias")
                     val leafBytes = reply.createByteArray() ?: return TransactionResult.Skip
                     val leafCert = CertificateHelper.toCertificate(leafBytes)
                         ?: return TransactionResult.Skip
@@ -123,7 +123,7 @@ class KeystoreInterceptor(
                 }
 
                 alias.startsWith(Credentials.CA_CERTIFICATE) -> {
-                    Logger.i("K1 postTr: return cached CA chain alias=$extractedAlias")
+                    Logger.d("K1 postTr: return cached CA chain alias=$extractedAlias")
                     val cachedChain = patchedChainCache.remove(extractedAlias)
                     if (cachedChain != null && cachedChain.size > 1) {
                         val caBytes = CertificateHelper.certificatesToByteArray(
@@ -166,7 +166,7 @@ class KeystoreInterceptor(
                 }
             }
             callback.onFinished(successResponse(), characteristics)
-            Logger.i("K1 generateKey alias=$alias algo=${params.algorithm}")
+            Logger.d("K1 generateKey alias=$alias algo=${params.algorithm}")
 
             replySuccess()
         } catch (e: Exception) {
@@ -191,7 +191,7 @@ class KeystoreInterceptor(
                 }
             }
             callback.onFinished(successResponse(), characteristics)
-            Logger.i("K1 getKeyChar alias=$alias")
+            Logger.d("K1 getKeyChar alias=$alias")
 
             replySuccess()
         } catch (e: Exception) {
@@ -223,7 +223,7 @@ class KeystoreInterceptor(
 
             val callback = IKeystoreExportKeyCallback.Stub.asInterface(callbackBinder)
             callback.onFinished(exportResult)
-            Logger.i("K1 exportKey alias=$alias")
+            Logger.d("K1 exportKey alias=$alias")
 
             replySuccess()
         } catch (e: Exception) {
@@ -266,7 +266,7 @@ class KeystoreInterceptor(
 
             val callback = IKeystoreCertificateChainCallback.Stub.asInterface(callbackBinder)
             callback.onFinished(successResponse(), certChain)
-            Logger.i("K1 attestKey alias=$alias chainLen=${chainBytes.size}")
+            Logger.d("K1 attestKey alias=$alias chainLen=${chainBytes.size}")
 
             replySuccess()
         } catch (e: Exception) {

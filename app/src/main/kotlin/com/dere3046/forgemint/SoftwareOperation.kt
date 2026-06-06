@@ -304,7 +304,7 @@ class SoftwareOperation(
         try {
             val result = primitive.finish(data, signature)
             finalized = true
-            Logger.i("SoftwareOperation finish txId=$txId OK")
+            Logger.d("SoftwareOperation finish txId=$txId OK")
             return result
         } catch (e: ServiceSpecificException) {
             throw e

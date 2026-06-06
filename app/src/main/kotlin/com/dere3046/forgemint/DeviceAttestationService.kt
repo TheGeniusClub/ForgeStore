@@ -53,7 +53,7 @@ object DeviceAttestationService {
     fun setup() {
         Logger.i("TEE check: functional=${isTeeFunctional}")
         if (cachedData != null) {
-            Logger.i("TEE attestation cache: osVersion=${cachedData!!.osVersion} osPatch=${cachedData!!.osPatchLevel}")
+            Logger.d("TEE attestation cache: osVersion=${cachedData!!.osVersion} osPatch=${cachedData!!.osPatchLevel}")
         } else {
             Logger.w("TEE attestation cache unavailable, using fallbacks")
         }
@@ -159,7 +159,7 @@ object DeviceAttestationService {
             if (verifiedBootKey?.all { it == 0.toByte() } == true) verifiedBootKey = null
             if (verifiedBootHash?.all { it == 0.toByte() } == true) verifiedBootHash = null
 
-            Logger.i("Parsed TEE attestation: ver=$attestVersion os=$osVersion osPatch=$osPatchLevel")
+            Logger.d("Parsed TEE attestation: ver=$attestVersion os=$osVersion osPatch=$osPatchLevel")
             AttestationData(moduleHash, verifiedBootKey, verifiedBootHash, attestVersion, keymasterVersion, osVersion, osPatchLevel, vendorPatchLevel, bootPatchLevel, false)
         } catch (e: Exception) {
             Logger.e("Failed to parse TEE attestation data", e)
