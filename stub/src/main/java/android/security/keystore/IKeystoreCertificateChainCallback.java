@@ -1,11 +1,15 @@
 package android.security.keystore;
 
 import android.os.IBinder;
+import android.os.RemoteException;
+import android.security.keymaster.KeymasterCertificateChain;
 
 public interface IKeystoreCertificateChainCallback {
-    abstract class Stub extends android.os.Binder implements IKeystoreCertificateChainCallback {
-        public static IKeystoreCertificateChainCallback asInterface(IBinder binder) {
-            return null;
+    void onFinished(KeystoreResponse response, KeymasterCertificateChain chain) throws RemoteException;
+
+    abstract class Stub {
+        public static IKeystoreCertificateChainCallback asInterface(IBinder b) {
+            throw new UnsupportedOperationException("STUB!");
         }
     }
 }

@@ -1,11 +1,15 @@
 package android.security.keystore;
 
 import android.os.IBinder;
+import android.os.RemoteException;
+import android.security.keymaster.ExportResult;
 
 public interface IKeystoreExportKeyCallback {
-    abstract class Stub extends android.os.Binder implements IKeystoreExportKeyCallback {
-        public static IKeystoreExportKeyCallback asInterface(IBinder binder) {
-            return null;
+    void onFinished(ExportResult result) throws RemoteException;
+
+    abstract class Stub {
+        public static IKeystoreExportKeyCallback asInterface(IBinder b) {
+            throw new UnsupportedOperationException("STUB!");
         }
     }
 }
