@@ -19,7 +19,7 @@ package com.dere3046.forgemint
 
 import android.os.IBinder
 import android.os.Parcel
-import android.system.keystore2.Authorization
+import android.os.Build
 import android.system.keystore2.Domain
 import android.system.keystore2.IKeystoreService
 import android.system.keystore2.KeyDescriptor
@@ -27,6 +27,8 @@ import android.system.keystore2.KeyEntryResponse
 import android.system.keystore2.KeyMetadata
 
 class Keystore2Interceptor : BinderInterceptor() {
+
+    private val batchParams = java.util.concurrent.ConcurrentHashMap<Long, String?>()
 
     override fun onPreTransact(
         txId: Long,
@@ -49,8 +51,20 @@ class Keystore2Interceptor : BinderInterceptor() {
         if (code == UPDATE_SUBCOMPONENT_TRANSACTION) {
             return handleUpdateSubcomponent(data, callingUid)
         }
+        if (code == GRANT_TRANSACTION) {
+            return handleGrant(data, callingUid)
+        }
+        if (code == UNGRANT_TRANSACTION) {
+            return handleUngrant(data, callingUid)
+        }
         if (code == LIST_ENTRIES_TRANSACTION || code == LIST_ENTRIES_BATCHED_TRANSACTION) {
             if (isGms(callingUid)) return TransactionResult.ContinueAndSkipPost
+            if (code == LIST_ENTRIES_BATCHED_TRANSACTION) {
+                parseBatchParams(txId, data)
+            }
+        }
+        if (code == GET_NUMBER_OF_ENTRIES_TRANSACTION) {
+            return TransactionResult.Continue
         }
         return TransactionResult.Continue
     }
@@ -91,7 +105,11 @@ class Keystore2Interceptor : BinderInterceptor() {
         if (shouldSkip(callingUid)) return TransactionResult.Skip
 
         if (code == LIST_ENTRIES_TRANSACTION || code == LIST_ENTRIES_BATCHED_TRANSACTION) {
-            return injectGeneratedKeys(reply, callingUid)
+            return injectGeneratedKeys(callingUid, reply, txId)
+        }
+
+        if (code == GET_NUMBER_OF_ENTRIES_TRANSACTION) {
+            return injectEntryCount(reply, callingUid)
         }
 
         if (code == GET_KEY_ENTRY_TRANSACTION) {
@@ -106,6 +124,22 @@ class Keystore2Interceptor : BinderInterceptor() {
             data.enforceInterface(IKeystoreService.DESCRIPTOR)
             val descriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Continue
 
+            if (descriptor.domain == Domain.GRANT) {
+                return handleGrantDomainGetKeyEntry(descriptor, uid)
+            }
+
+            if (descriptor.domain == Domain.KEY_ID) {
+                val metadataResult = handleGetKeyEntryByMetadata(descriptor, uid)
+                if (metadataResult != null) return metadataResult
+                val teeResp = StateManager.lookupTeeResponse(uid, descriptor.nspace)
+                if (teeResp != null) {
+                    val reply = Parcel.obtain()
+                    reply.writeNoException()
+                    reply.writeTypedObject(teeResp, 0)
+                    return TransactionResult.OverrideReply(reply)
+                }
+            }
+
             val entry = descriptor.alias?.let { StateManager.lookup(uid, it) }
                 ?: if (descriptor.domain == Domain.KEY_ID)
                     StateManager.lookupByNspace(uid, descriptor.nspace)
@@ -117,6 +151,105 @@ class Keystore2Interceptor : BinderInterceptor() {
             Logger.e("getKeyEntry failed", e)
             return TransactionResult.Continue
         }
+    }
+
+    private fun handleGrantDomainGetKeyEntry(descriptor: KeyDescriptor, uid: Int): TransactionResult {
+        val grantResult = StateManager.resolveGrant(descriptor.nspace, uid)
+        if (grantResult == null) {
+            if (StateManager.isGrantNspaceKnown(descriptor.nspace)) {
+                return replyKeystoreError(7)
+            }
+            return TransactionResult.ContinueAndSkipPost
+        }
+
+        val entry = StateManager.lookup(grantResult.uid, grantResult.alias)
+            ?: return replyKeystoreError(7)
+
+        val accessVector = StateManager.getGrantAccessVector(descriptor.nspace) ?: 0
+        if ((accessVector and 0x4) == 0) {
+            return replyKeystoreError(6)
+        }
+
+        return buildGetKeyEntryResponse(entry)
+    }
+
+    private fun handleGetKeyEntryByMetadata(descriptor: KeyDescriptor, uid: Int): TransactionResult? {
+        val metadata = StateManager.lookupMetadataByNspace(uid, descriptor.nspace) ?: return null
+        val response = KeyEntryResponse().apply {
+            this.metadata = metadata
+            iSecurityLevel = null
+        }
+        val reply = Parcel.obtain()
+        reply.writeNoException()
+        reply.writeTypedObject(response, 0)
+        return TransactionResult.OverrideReply(reply)
+    }
+
+    private fun handleGrant(data: Parcel, uid: Int): TransactionResult {
+        try {
+            data.enforceInterface(IKeystoreService.DESCRIPTOR)
+            val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Continue
+            val granteeUid = data.readInt()
+            val accessVector = data.readInt()
+
+            val entry = keyDescriptor.alias?.let { StateManager.lookup(uid, it) }
+                ?: if (keyDescriptor.domain == Domain.KEY_ID)
+                    StateManager.lookupByNspace(uid, keyDescriptor.nspace)
+                else null
+
+            if (entry == null) return TransactionResult.ContinueAndSkipPost
+
+            if (Build.VERSION.SDK_INT < 36) {
+                return replyKeystoreError(6)
+            }
+
+            val grantNspace = StateManager.issueGrant(
+                StateManager.KeyIdentifier(uid, entry.alias),
+                granteeUid, accessVector,
+            )
+
+            val reply = Parcel.obtain()
+            reply.writeNoException()
+            reply.writeTypedObject(KeyDescriptor().apply {
+                domain = Domain.GRANT
+                nspace = grantNspace
+                alias = null
+                blob = null
+            }, 0)
+            return TransactionResult.OverrideReply(reply)
+        } catch (_: Exception) {}
+        return TransactionResult.ContinueAndSkipPost
+    }
+
+    private fun handleUngrant(data: Parcel, uid: Int): TransactionResult {
+        try {
+            data.enforceInterface(IKeystoreService.DESCRIPTOR)
+            val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Continue
+            val granteeUid = data.readInt()
+
+            val entry = keyDescriptor.alias?.let { StateManager.lookup(uid, it) }
+                ?: if (keyDescriptor.domain == Domain.KEY_ID)
+                    StateManager.lookupByNspace(uid, keyDescriptor.nspace)
+                else null
+
+            if (entry == null) return TransactionResult.ContinueAndSkipPost
+
+            StateManager.revokeGrantForOwner(StateManager.KeyIdentifier(uid, entry.alias), granteeUid)
+
+            val reply = Parcel.obtain()
+            reply.writeNoException()
+            return TransactionResult.OverrideReply(reply)
+        } catch (_: Exception) {}
+        return TransactionResult.ContinueAndSkipPost
+    }
+
+    private fun replyKeystoreError(errorCode: Int): TransactionResult {
+        val override = Parcel.obtain()
+        override.writeInt(-8)
+        override.writeString("Error::Rc($errorCode)")
+        override.writeInt(0)
+        override.writeInt(errorCode)
+        return TransactionResult.OverrideReply(override)
     }
 
     private fun buildGetKeyEntryResponse(entry: StateManager.KeyEntry): TransactionResult {
@@ -141,7 +274,11 @@ class Keystore2Interceptor : BinderInterceptor() {
         try {
             data.enforceInterface(IKeystoreService.DESCRIPTOR)
             val descriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Continue
-            val alias = descriptor.alias ?: return TransactionResult.Continue
+            val alias = descriptor.alias
+                ?: if (descriptor.domain == Domain.KEY_ID)
+                    StateManager.lookupByNspace(uid, descriptor.nspace)?.alias
+                else null
+            if (alias == null) return TransactionResult.Continue
 
             if (StateManager.lookup(uid, alias) != null) {
                 Logger.i("deleteKey alias=$alias UID=$uid → cleaning up")
@@ -184,17 +321,24 @@ class Keystore2Interceptor : BinderInterceptor() {
                 return TransactionResult.Skip
             }
 
-            val keyId = StateManager.KeyIdentifier(uid, keyDescriptor.alias ?: return TransactionResult.Skip)
+            val keyId = keyDescriptor.alias?.let { alias ->
+                StateManager.KeyIdentifier(uid, alias)
+            }
 
-            val cachedChain = StateManager.getPatchedChain(keyId)
             val patchedChain: Array<java.security.cert.Certificate>
-            if (cachedChain != null) {
-                Logger.d("getKeyEntry POST: using cached patched chain for alias=${keyDescriptor.alias}")
-                patchedChain = cachedChain
+            if (keyId != null) {
+                val cached = StateManager.getPatchedChain(keyId)
+                if (cached != null) {
+                    Logger.d("getKeyEntry POST: using cached patched chain for alias=${keyDescriptor.alias}")
+                    patchedChain = cached
+                } else {
+                    Logger.i("getKeyEntry POST: live patching chain for alias=${keyDescriptor.alias}")
+                    patchedChain = AttestationPatcher.patchCertificateChain(originalChain, uid)
+                    StateManager.cachePatchedChain(keyId, patchedChain)
+                }
             } else {
-                Logger.i("getKeyEntry POST: live patching chain for alias=${keyDescriptor.alias}")
+                Logger.i("getKeyEntry POST: live patching chain (anonymous descriptor)")
                 patchedChain = AttestationPatcher.patchCertificateChain(originalChain, uid)
-                StateManager.cachePatchedChain(keyId, patchedChain)
             }
 
             CertificateHelper.updateCertificateChain(uid, metadata, patchedChain)
@@ -249,15 +393,28 @@ class Keystore2Interceptor : BinderInterceptor() {
         return TransactionResult.OverrideReply(override)
     }
 
-    private fun injectGeneratedKeys(reply: Parcel, uid: Int): TransactionResult {
+    private fun parseBatchParams(txId: Long, data: Parcel) {
+        try {
+            data.enforceInterface(IKeystoreService.DESCRIPTOR)
+            data.readInt()
+            data.readLong()
+            val startPastAlias = data.readString()
+            batchParams[txId] = startPastAlias
+        } catch (_: Exception) {}
+    }
+
+    private fun injectGeneratedKeys(uid: Int, reply: Parcel, txId: Long): TransactionResult {
         try {
             reply.readException()
-            val existing = mutableMapOf<String, KeyDescriptor>()
+            val startPastAlias = batchParams.remove(txId)
+            val existing = java.util.TreeMap<String, KeyDescriptor>()
             reply.createTypedArray(KeyDescriptor.CREATOR)?.forEach { kd ->
                 kd.alias?.let { existing.putIfAbsent(it, kd) }
             }
 
-            val generated = StateManager.listForUid(uid).take(100)
+            val generated = StateManager.listForUid(uid)
+                .filter { startPastAlias == null || it.alias > startPastAlias }
+                .take(100)
             for (gk in generated) {
                 existing[gk.alias] = KeyDescriptor().apply {
                     domain = Domain.APP
@@ -267,14 +424,32 @@ class Keystore2Interceptor : BinderInterceptor() {
                 }
             }
 
-            Logger.i("listEntries injected ${generated.size} keys for UID=$uid (total=${existing.size})")
+            val result = existing.values.toTypedArray()
+            Logger.i("listEntries injected ${generated.size} keys for UID=$uid startPastAlias=$startPastAlias (total=${existing.size})")
 
             val override = Parcel.obtain()
             override.writeNoException()
-            override.writeTypedArray(existing.values.toTypedArray(), 0)
+            override.writeTypedArray(result, 0)
             return TransactionResult.OverrideReply(override)
         } catch (e: Exception) {
             Logger.e("listEntries injection failed", e)
+            return TransactionResult.Skip
+        }
+    }
+
+    private fun injectEntryCount(reply: Parcel, uid: Int): TransactionResult {
+        try {
+            reply.readException()
+            val halCount = reply.readInt()
+            val generatedCount = StateManager.listForUid(uid).size
+            val total = halCount + generatedCount
+            Logger.d("getNumberOfEntries UID=$uid hal=$halCount generated=$generatedCount total=$total")
+
+            val override = Parcel.obtain()
+            override.writeNoException()
+            override.writeInt(total)
+            return TransactionResult.OverrideReply(override)
+        } catch (e: Exception) {
             return TransactionResult.Skip
         }
     }
@@ -300,6 +475,9 @@ class Keystore2Interceptor : BinderInterceptor() {
         val GET_KEY_ENTRY_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_getKeyEntry") }
         val DELETE_KEY_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_deleteKey") }
         val UPDATE_SUBCOMPONENT_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_updateSubcomponent") }
+        val GRANT_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_grant") }
+        val UNGRANT_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_ungrant") }
+        val GET_NUMBER_OF_ENTRIES_TRANSACTION: Int by lazy { resolveCode("TRANSACTION_getNumberOfEntries") }
 
         private fun resolveCode(name: String): Int {
             return try {

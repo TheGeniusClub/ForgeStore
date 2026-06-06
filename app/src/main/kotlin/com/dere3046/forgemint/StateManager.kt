@@ -19,8 +19,10 @@ package com.dere3046.forgemint
 
 import android.os.IBinder
 import android.system.keystore2.IKeystoreSecurityLevel
+import android.system.keystore2.KeyEntryResponse
 import android.system.keystore2.KeyMetadata
 import java.security.KeyPair
+import java.security.SecureRandom
 import java.security.cert.Certificate
 import java.security.cert.X509Certificate
 import java.util.concurrent.ConcurrentHashMap
@@ -34,7 +36,8 @@ object StateManager {
         val alias: String,
         val nspace: Long,
         val metadata: KeyMetadata,
-        val keyPair: KeyPair,
+        val keyPair: KeyPair? = null,
+        val secretKey: javax.crypto.SecretKey? = null,
         val securityLevel: Int,
         val securityLevelBinder: IKeystoreSecurityLevel?,
         val certChain: List<X509Certificate>,
@@ -42,22 +45,63 @@ object StateManager {
 
     private val cache = ConcurrentHashMap<String, KeyEntry>()
     private val patchedChains = ConcurrentHashMap<KeyIdentifier, Array<Certificate>>()
-    private val opCounters = ConcurrentHashMap<Int, java.util.concurrent.atomic.AtomicInteger>()
+    private val metadataCache = ConcurrentHashMap<String, KeyMetadata>()
+    private val nspaceToAlias = ConcurrentHashMap<String, String>()
+    private val teeResponses = ConcurrentHashMap<KeyIdentifier, KeyEntryResponse>()
+    private val activeOps = ConcurrentHashMap<Int, java.util.concurrent.ConcurrentLinkedDeque<SoftwareOperation>>()
 
     private const val MAX_OPS_PER_UID = 15
 
-    fun acquireOp(uid: Int): Boolean {
-        val counter = opCounters.getOrPut(uid) { java.util.concurrent.atomic.AtomicInteger(0) }
-        if (counter.incrementAndGet() > MAX_OPS_PER_UID) {
-            counter.decrementAndGet()
-            Logger.w("LRU: UID=$uid op limit ($MAX_OPS_PER_UID) reached")
-            return false
+    data class SoftwareGrant(
+        val granteeUid: Int,
+        val accessVector: Int,
+        val ownerKeyId: KeyIdentifier,
+    )
+
+    private val grantMap = ConcurrentHashMap<Long, SoftwareGrant>()
+
+    fun issueGrant(ownerKeyId: KeyIdentifier, granteeUid: Int, accessVector: Int): Long {
+        var nspace: Long
+        do { nspace = java.security.SecureRandom().nextLong() } while (nspace == 0L || grantMap.containsKey(nspace))
+        grantMap[nspace] = SoftwareGrant(granteeUid, accessVector, ownerKeyId)
+        Logger.d("Grant issued owner=${ownerKeyId} grantee=$granteeUid nspace=$nspace")
+        return nspace
+    }
+
+    fun resolveGrant(nspace: Long, callerUid: Int): KeyIdentifier? {
+        val grant = grantMap[nspace] ?: return null
+        if (grant.granteeUid != callerUid) return null
+        if (cache.values.none { it.uid == grant.ownerKeyId.uid && it.alias == grant.ownerKeyId.alias }) return null
+        return grant.ownerKeyId
+    }
+
+    fun isGrantNspaceKnown(nspace: Long): Boolean = grantMap.containsKey(nspace)
+
+    fun getGrantAccessVector(nspace: Long): Int? = grantMap[nspace]?.accessVector
+
+    fun revokeGrantForOwner(ownerKeyId: KeyIdentifier, granteeUid: Int) {
+        val toRemove = grantMap.entries.filter {
+            it.value.ownerKeyId == ownerKeyId && it.value.granteeUid == granteeUid
+        }.map { it.key }
+        toRemove.forEach { grantMap.remove(it) }
+    }
+
+    fun acquireOp(uid: Int, operation: SoftwareOperation) {
+        val ops = activeOps.computeIfAbsent(uid) { java.util.concurrent.ConcurrentLinkedDeque() }
+        ops.removeIf { it.finalized }
+        while (ops.size >= MAX_OPS_PER_UID) {
+            val oldest = ops.pollFirst() ?: break
+            if (!oldest.finalized) {
+                Logger.i("LRU: aborting oldest unfinished op for uid=$uid")
+                oldest.abort()
+            }
         }
-        return true
+        ops.addLast(operation)
     }
 
     fun releaseOp(uid: Int) {
-        opCounters[uid]?.decrementAndGet()
+        activeOps[uid]?.removeIf { it.finalized }
+        activeOps[uid]?.takeIf { it.isEmpty() }?.let { activeOps.remove(uid) }
     }
 
     fun store(entry: KeyEntry) {
@@ -71,10 +115,57 @@ object StateManager {
         return cache.values.find { it.uid == uid && it.nspace == nspace }
     }
 
+    fun cacheMetadataSnapshot(keyId: KeyIdentifier, metadata: KeyMetadata) {
+        val nspace = metadata.key?.nspace ?: return
+        metadataCache[key(keyId.uid, keyId.alias)] = metadata
+        nspaceToAlias[key(uid = keyId.uid, alias = nspace.toString())] = keyId.alias
+        Logger.d("Cached metadata snapshot for ${keyId.alias} nspace=$nspace")
+    }
+
+    fun lookupMetadataByNspace(uid: Int, nspace: Long): KeyMetadata? {
+        val entryKey = nspaceToAlias[key(uid, nspace.toString())]
+            ?: return metadataCache.values.find {
+                it.key?.nspace == nspace && it.key?.domain == android.system.keystore2.Domain.KEY_ID
+            }
+        return metadataCache[key(uid, entryKey)]
+    }
+
+    fun cacheTeeResponse(keyId: KeyIdentifier, metadata: KeyMetadata, levelBinder: IKeystoreSecurityLevel) {
+        teeResponses[keyId] = KeyEntryResponse().apply {
+            this.metadata = metadata
+            iSecurityLevel = levelBinder
+        }
+        Logger.d("Cached teeResponse for ${keyId.alias}")
+    }
+
+    fun lookupTeeResponse(uid: Int, nspace: Long): KeyEntryResponse? {
+        return teeResponses.entries.find {
+            it.key.uid == uid && it.value.metadata?.key?.nspace == nspace
+        }?.value
+    }
+
+    fun lookupByAliasOrDomain(uid: Int, descriptor: android.system.keystore2.KeyDescriptor): KeyEntry? {
+        return when (descriptor.domain) {
+            android.system.keystore2.Domain.KEY_ID -> lookupByNspace(uid, descriptor.nspace)
+            android.system.keystore2.Domain.APP -> descriptor.alias?.let { lookup(uid, it) }
+            else -> null
+        }
+    }
+
     fun remove(uid: Int, alias: String) {
         cache.remove(key(uid, alias))
+        metadataCache.remove(key(uid, alias))
+        teeResponses.remove(KeyIdentifier(uid, alias))
         patchedChains.remove(KeyIdentifier(uid, alias))
+        purgeGrants(KeyIdentifier(uid, alias))
         GeneratedKeyPersistence.remove(uid, alias)
+    }
+
+    private fun purgeGrants(keyId: KeyIdentifier) {
+        val toRemove = grantMap.entries.filter {
+            it.value.ownerKeyId == keyId
+        }.map { it.key }
+        toRemove.forEach { grantMap.remove(it) }
     }
 
     private var keysLoaded = false
@@ -94,6 +185,7 @@ object StateManager {
                 nspace = lk.nspace,
                 metadata = lk.metadata,
                 keyPair = lk.keyPair,
+                secretKey = lk.secretKey,
                 securityLevel = lk.securityLevel,
                 securityLevelBinder = binder,
                 certChain = lk.certChain,
@@ -117,7 +209,11 @@ object StateManager {
         val count = cache.size
         cache.clear()
         patchedChains.clear()
-        opCounters.clear()
+        metadataCache.clear()
+        nspaceToAlias.clear()
+        teeResponses.clear()
+        grantMap.clear()
+        activeOps.clear()
         Logger.i("Cleared all state ($count entries)")
     }
 

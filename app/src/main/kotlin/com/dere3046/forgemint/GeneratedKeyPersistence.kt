@@ -40,7 +40,7 @@ import kotlin.concurrent.withLock
 object GeneratedKeyPersistence {
 
     private const val DIR = "/data/adb/forgemint/keys"
-    private const val FORMAT_VERSION = 1
+    private const val FORMAT_VERSION = 2
     private val locks = ConcurrentHashMap<String, ReentrantLock>()
     private val certFactory by lazy { CertificateFactory.getInstance("X.509") }
 
@@ -60,16 +60,27 @@ object GeneratedKeyPersistence {
                     out.writeLong(entry.nspace)
                     out.writeInt(entry.securityLevel)
 
-                    val algo = entry.keyPair.private.algorithm
-                    out.writeUTF(algo)
-
-                    val pk = entry.keyPair.private.encoded
-                    out.writeInt(pk.size)
-                    out.write(pk)
-
-                    val pub = entry.keyPair.public.encoded
-                    out.writeInt(pub.size)
-                    out.write(pub)
+                    if (entry.keyPair != null) {
+                        out.writeByte(0)
+                        val algo = entry.keyPair.private.algorithm
+                        out.writeUTF(algo)
+                        val pk = entry.keyPair.private.encoded
+                        out.writeInt(pk.size)
+                        out.write(pk)
+                        val pub = entry.keyPair.public.encoded
+                        out.writeInt(pub.size)
+                        out.write(pub)
+                    } else if (entry.secretKey != null) {
+                        out.writeByte(1)
+                        val algo = entry.secretKey.algorithm
+                        out.writeUTF(algo)
+                        val encoded = entry.secretKey.encoded
+                        out.writeInt(encoded.size)
+                        out.write(encoded)
+                    } else {
+                        Logger.w("Persisting key with no key material: ${entry.alias}")
+                        return
+                    }
 
                     val mp = Parcel.obtain()
                     mp.writeTypedObject(entry.metadata, 0)
@@ -118,7 +129,7 @@ object GeneratedKeyPersistence {
             try {
                 DataInputStream(FileInputStream(file)).use { input ->
                     val version = input.readInt()
-                    if (version != FORMAT_VERSION) {
+                    if (version != 1 && version != FORMAT_VERSION) {
                         Logger.w("persist: skipping $key (version=$version)")
                         return null
                     }
@@ -126,20 +137,31 @@ object GeneratedKeyPersistence {
                     val alias = input.readUTF()
                     val nspace = input.readLong()
                     val secLevel = input.readInt()
-                    val algo = input.readUTF()
 
-                    val pkLen = input.readInt()
-                    val pk = ByteArray(pkLen)
-                    input.readFully(pk)
+                    val keyType = if (version >= 2) input.readByte().toInt() else 0
+                    val keyPair: KeyPair?
+                    val secretKey: javax.crypto.SecretKey?
+                    var certAlgo: String
 
-                    val pubLen = input.readInt()
-                    val pub = ByteArray(pubLen)
-                    input.readFully(pub)
-
-                    val kf = KeyFactory.getInstance(algo)
-                    val privateKey = kf.generatePrivate(PKCS8EncodedKeySpec(pk))
-                    val publicKey = kf.generatePublic(X509EncodedKeySpec(pub))
-                    val keyPair = KeyPair(publicKey, privateKey)
+                    if (keyType == 1) {
+                        keyPair = null
+                        certAlgo = input.readUTF()
+                        val encLen = input.readInt()
+                        val enc = ByteArray(encLen)
+                        input.readFully(enc)
+                        secretKey = javax.crypto.spec.SecretKeySpec(enc, certAlgo)
+                    } else {
+                        certAlgo = input.readUTF()
+                        val pkLen = input.readInt()
+                        val pk = ByteArray(pkLen)
+                        input.readFully(pk)
+                        val pubLen = input.readInt()
+                        val pub = ByteArray(pubLen)
+                        input.readFully(pub)
+                        val kf = KeyFactory.getInstance(certAlgo)
+                        keyPair = KeyPair(kf.generatePublic(X509EncodedKeySpec(pub)), kf.generatePrivate(PKCS8EncodedKeySpec(pk)))
+                        secretKey = null
+                    }
 
                     val mdLen = input.readInt()
                     val md = ByteArray(mdLen)
@@ -161,7 +183,7 @@ object GeneratedKeyPersistence {
                     }
 
                     Logger.i("persist: loaded key $key (uid=$uid alias=$alias)")
-                    return LoadedKey(uid, alias, nspace, secLevel, keyPair, metadata, chain)
+                    return LoadedKey(uid, alias, nspace, secLevel, keyPair, secretKey, metadata, chain)
                 }
             } catch (e: Exception) {
                 Logger.e("persist: load failed for ${file.name}", e)
@@ -185,7 +207,8 @@ object GeneratedKeyPersistence {
         val alias: String,
         val nspace: Long,
         val securityLevel: Int,
-        val keyPair: KeyPair,
+        val keyPair: KeyPair?,
+        val secretKey: javax.crypto.SecretKey?,
         val metadata: KeyMetadata?,
         val certChain: List<X509Certificate>,
     )

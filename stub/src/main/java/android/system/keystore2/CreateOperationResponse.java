@@ -7,6 +7,7 @@ import android.os.Parcelable;
 public class CreateOperationResponse implements Parcelable {
     public IKeystoreOperation iOperation;
     public OperationChallenge operationChallenge;
+    public KeyParameters parameters;
 
     public static final Creator<CreateOperationResponse> CREATOR = new Creator<>() {
         public CreateOperationResponse createFromParcel(Parcel in) {

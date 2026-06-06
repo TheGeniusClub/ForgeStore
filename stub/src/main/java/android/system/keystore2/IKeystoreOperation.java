@@ -9,7 +9,7 @@ public interface IKeystoreOperation extends IInterface {
     String DESCRIPTOR = "android.system.keystore2.IKeystoreOperation";
 
     byte[] finish(byte[] input, byte[] signature) throws RemoteException;
-    int updateAad(byte[] input) throws RemoteException;
+    void updateAad(byte[] input) throws RemoteException;
     byte[] update(byte[] input) throws RemoteException;
     void abort() throws RemoteException;
 

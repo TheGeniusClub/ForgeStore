@@ -54,6 +54,7 @@ data class KeyMintAttestation(
     val manufacturer: ByteArray?,
     val model: ByteArray?,
     val secondImei: ByteArray?,
+    val nonce: ByteArray? = null,
     val includeUniqueId: Boolean?,
     val callerNonce: Boolean?,
     val minMacLength: Int?,
@@ -69,6 +70,7 @@ data class KeyMintAttestation(
     val originationExpireDateTime: Date?,
     val usageExpireDateTime: Date?,
     val maxBootLevel: Int?,
+    val rawParams: Array<KeyParameter> = emptyArray(),
 ) {
     constructor(params: Array<KeyParameter>) : this(
         algorithm = params.findAlgorithm(Tag.ALGORITHM) ?: 0,
@@ -96,6 +98,7 @@ data class KeyMintAttestation(
         manufacturer = params.findBlob(Tag.ATTESTATION_ID_MANUFACTURER),
         model = params.findBlob(Tag.ATTESTATION_ID_MODEL),
         secondImei = params.findBlob(Tag.ATTESTATION_ID_SECOND_IMEI),
+        nonce = params.findBlob(Tag.NONCE),
         includeUniqueId = params.findBoolean(Tag.INCLUDE_UNIQUE_ID),
         callerNonce = params.findBoolean(Tag.CALLER_NONCE),
         minMacLength = params.findInteger(Tag.MIN_MAC_LENGTH),
@@ -111,6 +114,7 @@ data class KeyMintAttestation(
         originationExpireDateTime = params.findDate(Tag.ORIGINATION_EXPIRE_DATETIME),
         usageExpireDateTime = params.findDate(Tag.USAGE_EXPIRE_DATETIME),
         maxBootLevel = params.findInteger(Tag.MAX_BOOT_LEVEL),
+        rawParams = params,
     )
 
     val isAttestKey: Boolean
@@ -118,6 +122,15 @@ data class KeyMintAttestation(
 
     val isImportKey: Boolean
         get() = origin == KeyOrigin.IMPORTED || origin == KeyOrigin.SECURELY_IMPORTED
+
+    val isSymmetric: Boolean
+        get() = algorithm == android.hardware.security.keymint.Algorithm.AES ||
+            algorithm == android.hardware.security.keymint.Algorithm.HMAC ||
+            algorithm == android.hardware.security.keymint.Algorithm.TRIPLE_DES
+
+    fun hasTag(tag: Int): Boolean {
+        return rawParams.any { it.tag == tag }
+    }
 }
 
 

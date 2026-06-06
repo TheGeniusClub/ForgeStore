@@ -24,6 +24,7 @@ import android.system.keystore2.IKeystoreOperation
 class OperationInterceptor(
     private val original: IKeystoreOperation?,
     private val backdoor: IBinder,
+    private val isAead: Boolean,
 ) : BinderInterceptor() {
 
     override fun onPreTransact(
@@ -35,10 +36,22 @@ class OperationInterceptor(
         callingPid: Int,
         data: Parcel,
     ): TransactionResult {
+        if (code == UPDATE_AAD_TRANSACTION && !isAead) {
+            return replySse(KeystoreErrorCodes.invalidTag)
+        }
         if (code == FINISH_TRANSACTION || code == ABORT_TRANSACTION) {
             BinderInterceptor.unregister(backdoor, target)
         }
         return TransactionResult.ContinueAndSkipPost
+    }
+
+    private fun replySse(errorCode: Int): TransactionResult {
+        val override = Parcel.obtain()
+        override.writeInt(-8)
+        override.writeString("Error::Km($errorCode)")
+        override.writeInt(0)
+        override.writeInt(errorCode)
+        return TransactionResult.OverrideReply(override)
     }
 
     companion object {

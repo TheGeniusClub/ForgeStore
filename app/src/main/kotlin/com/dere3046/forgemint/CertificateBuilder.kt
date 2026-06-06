@@ -84,18 +84,36 @@ object CertificateBuilder {
         uid: Int,
         securityLevel: Int,
         signerKeyPair: KeyPair? = null,
+        attestKeyCert: X509Certificate? = null,
     ): List<Certificate>? {
         return runCatching {
             val signingKey = signerKeyPair ?: keybox.keyPair
-            val issuerName = if (signerKeyPair != null)
-                X500Name("CN=Android Keystore Key")
-            else
-                X509CertificateHolder(keybox.certificates[0].encoded).subject
+            val issuerName = when {
+                attestKeyCert != null -> X509CertificateHolder(attestKeyCert.encoded).subject
+                signerKeyPair != null -> X500Name("CN=Android Keystore Key")
+                else -> X509CertificateHolder(keybox.certificates[0].encoded).subject
+            }
             val leafCert = buildLeafCertificate(
                 subjectKeyPair, signingKey, issuerName,
                 params, uid, securityLevel,
             )
             listOf(leafCert) + keybox.certificates
+        }.getOrNull()
+    }
+
+    fun generateFallbackChain(
+        subjectKeyPair: KeyPair,
+        params: KeyMintAttestation,
+        uid: Int,
+        securityLevel: Int,
+    ): List<Certificate>? {
+        return runCatching {
+            val issuer = X500Name("CN=Android Keystore Key")
+            val leafCert = buildLeafCertificate(
+                subjectKeyPair, subjectKeyPair, issuer,
+                params, uid, securityLevel,
+            )
+            listOf(leafCert)
         }.getOrNull()
     }
 
