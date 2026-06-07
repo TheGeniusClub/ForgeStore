@@ -493,15 +493,11 @@ class KeyMintInterceptor(
 
         val keybox = KeyboxReader.loadKeybox(params.algorithm)
         val attestEntry: StateManager.KeyEntry? = if (attestKeyDescriptor != null) {
-            val alias = attestKeyDescriptor.alias
-            if (alias == null) {
-                Logger.w("GenKeyFailed: attestKeyDescriptor alias is null")
-                return null
-            }
-            val entry = StateManager.lookup(uid, alias)
+            val entry = attestKeyDescriptor.alias?.let { StateManager.lookup(uid, it) }
                 ?: StateManager.lookupByNspace(uid, attestKeyDescriptor.nspace)
             if (entry == null) {
-                Logger.w("GenKeyFailed: attest key not found alias=$alias")
+                Logger.w("GenKeyFailed: attest key not found " +
+                    "alias=${attestKeyDescriptor.alias} nspace=${attestKeyDescriptor.nspace}")
                 return null
             }
             entry
