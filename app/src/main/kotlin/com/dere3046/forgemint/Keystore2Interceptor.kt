@@ -323,6 +323,7 @@ class Keystore2Interceptor : BinderInterceptor() {
     }
 
     private fun handlePostGetKeyEntry(uid: Int, data: Parcel, reply: Parcel): TransactionResult {
+        if (KeyMintInterceptor.hasException(reply)) return TransactionResult.Skip
         val savedReplyPos = reply.dataPosition()
         try {
             reply.setDataPosition(0)

@@ -244,6 +244,7 @@ class KeyMintInterceptor(
     }
 
     private fun handlePostImportKey(uid: Int, data: Parcel, reply: Parcel): TransactionResult {
+        if (hasException(reply)) return TransactionResult.Skip
         try {
             data.enforceInterface(IKeystoreSecurityLevel.DESCRIPTOR)
             val keyDescriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Skip
@@ -466,6 +467,14 @@ class KeyMintInterceptor(
                 Logger.e("Failed to resolve $name", e)
                 -1
             }
+        }
+
+        fun hasException(reply: Parcel): Boolean {
+            val savedPos = reply.dataPosition()
+            reply.setDataPosition(0)
+            val hasEx = runCatching { reply.readException() }.isFailure
+            reply.setDataPosition(savedPos)
+            return hasEx
         }
     }
 
