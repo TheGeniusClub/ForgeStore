@@ -71,6 +71,3 @@ add_executable(libinject.so injector.c)
 target_include_directories(libinject.so PRIVATE .)
 target_link_libraries(libinject.so log dl)
 target_compile_options(libinject.so PRIVATE -Wall -Wextra -Werror -Wno-unused-parameter)
-
-add_library(forgemint_kmsg SHARED kmsg.c)
-target_compile_options(forgemint_kmsg PRIVATE -Wall -Wextra -Werror -Wno-unused-parameter)
