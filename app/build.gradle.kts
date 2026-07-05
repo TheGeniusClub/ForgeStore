@@ -146,7 +146,7 @@ androidComponents {
             from(tempModuleDir)
         }
 
-        tasks.register<Exec>("push${capitalized}") {
+        val pushTask = tasks.register<Exec>("push${capitalized}") {
             group = "ForgeStore Module Installation"
             description = "Pushes module to device."
             dependsOn(zipTask)
@@ -156,8 +156,15 @@ androidComponents {
         tasks.register<Exec>("installMagisk${capitalized}") {
             group = "ForgeStore Module Installation"
             description = "Installs module via Magisk."
-            dependsOn(zipTask)
+            dependsOn(pushTask)
             commandLine("adb", "shell", "su", "-c", "magisk --install-module /data/local/tmp/$zipFileName")
+        }
+
+        tasks.register<Exec>("installKernelSU${capitalized}") {
+            group = "ForgeStore Module Installation"
+            description = "Installs module via KernelSU."
+            dependsOn(pushTask)
+            commandLine("adb", "shell", "su", "-c", "ksud module install /data/local/tmp/$zipFileName")
         }
     }
 }
