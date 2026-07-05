@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.system.keystore2.IKeystoreSecurityLevel
 import android.system.keystore2.KeyMetadata

@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.hardware.security.keymint.Algorithm
 import android.security.keystore.KeyProperties
@@ -36,7 +36,7 @@ import org.xmlpull.v1.XmlPullParserFactory
 
 object KeyboxReader {
 
-    private const val KEYBOX_FILE = "/data/adb/forgemint/keybox.xml"
+    private const val KEYBOX_FILE = "/data/adb/forgestore/keybox.xml"
 
     private var keyboxCache: ConcurrentHashMap<String, CertificateBuilder.KeyboxData>? = null
 

@@ -15,12 +15,12 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.util.Log
 
 object Logger {
-    private const val TAG = "ForgeMint"
+    private const val TAG = "ForgeStore"
 
     @Volatile var useLogcat = false
     @Volatile var verbose = false

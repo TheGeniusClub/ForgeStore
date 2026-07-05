@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.os.Build
 import android.os.IBinder
@@ -43,12 +43,12 @@ object App {
 
     @JvmStatic
     fun main(args: Array<String>) {
-        modDir = System.getProperty("moddir") ?: "/data/adb/modules/forgemint"
+        modDir = System.getProperty("moddir") ?: "/data/adb/modules/forgestore"
 
         ConfigManager.initConfig()
         Logger.setMode(ConfigManager.isDebugEnabled)
         Logger.verbose = ConfigManager.isVerboseLog
-        Logger.i("ForgeMint daemon starting (moddir=$modDir, sdk=${Build.VERSION.SDK_INT}, mode=${if (Logger.useLogcat) "logcat" else "kmsg"})")
+        Logger.i("ForgeStore daemon starting (moddir=$modDir, sdk=${Build.VERSION.SDK_INT}, mode=${if (Logger.useLogcat) "logcat" else "kmsg"})")
         prepareEnvironment()
         setupProviders()
         ConfigManager.initialize()
@@ -78,7 +78,7 @@ object App {
             Thread.sleep(RETRY_DELAY_MS)
         }
 
-        Logger.i("ForgeMint daemon ready")
+        Logger.i("ForgeStore daemon ready")
         Looper.loop()
     }
 
@@ -159,8 +159,8 @@ object App {
                 return false
             }
 
-            val cmd = arrayOf("$modDir/lib/libinject.so", pid, "$modDir/lib/libforgemint.so")
-            Logger.d("Running: $modDir/lib/libinject.so $pid $modDir/lib/libforgemint.so")
+            val cmd = arrayOf("$modDir/lib/libinject.so", pid, "$modDir/lib/libforgestore.so")
+            Logger.d("Running: $modDir/lib/libinject.so $pid $modDir/lib/libforgestore.so")
 
             val process = Runtime.getRuntime().exec(cmd)
             val exitCode = process.waitFor()

@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.os.FileObserver
 import android.os.ServiceManager
@@ -33,7 +33,7 @@ object ConfigManager {
         val all: Int?,
     )
 
-    private const val CONFIG_DIR = "/data/adb/forgemint"
+    private const val CONFIG_DIR = "/data/adb/forgestore"
     private const val TARGET_FILE = "target.txt"
     private const val TEE_STATUS_FILE = "tee_status.txt"
     private const val PATCH_FILE = "security_patch.txt"

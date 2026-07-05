@@ -1,6 +1,6 @@
-id=forgemint
-name=ForgeMint
+id=forgestore
+name=ForgeStore
 version=$REPLACEMEVER
 versionCode=$REPLACEMEVERCODE
 author=dere3046
-description=ForgeMint KeyMint attestation hook
+description=ForgeStore KeyMint attestation hook

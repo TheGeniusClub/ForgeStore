@@ -35,7 +35,7 @@ static void close_kmsg(void) {
 }
 
 JNIEXPORT jboolean JNICALL
-Java_com_dere3046_forgemint_KmsgLogger_nativeLog(
+Java_com_dere3046_forgestore_KmsgLogger_nativeLog(
     JNIEnv *env, jclass cls, jint priority, jstring jtag, jstring jmsg)
 {
     (void)cls;

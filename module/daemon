@@ -19,4 +19,4 @@ MODDIR=$1
 
 exec /system/bin/app_process -Djava.class.path="$MODDIR/service.apk" \
     -Dmoddir="$MODDIR" "$MODDIR" \
-    --nice-name=forgemint com.dere3046.forgemint.App
+    --nice-name=forgestore com.dere3046.forgestore.App

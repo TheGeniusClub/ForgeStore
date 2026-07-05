@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.util.Log
 
@@ -25,10 +25,10 @@ object KmsgLogger {
 
     fun init() {
         try {
-            System.loadLibrary("forgemint_kmsg")
+            System.loadLibrary("forgestore_kmsg")
             available = true
         } catch (_: UnsatisfiedLinkError) {
-            Log.w("ForgeMint", "kmsg native lib not available, falling back to logcat")
+            Log.w("ForgeStore", "kmsg native lib not available, falling back to logcat")
         }
     }
 

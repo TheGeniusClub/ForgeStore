@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -45,7 +45,7 @@ object DeviceAttestationService {
         val cannotAttestIds: Boolean,
     )
 
-    private const val TEE_CHECK_KEY_ALIAS = "ForgeMint_AttestationCheck"
+    private const val TEE_CHECK_KEY_ALIAS = "ForgeStore_AttestationCheck"
 
     val isTeeFunctional: Boolean by lazy { checkTeeFunctionality() }
     val cachedData: AttestationData? by lazy { fetchAttestationData() }

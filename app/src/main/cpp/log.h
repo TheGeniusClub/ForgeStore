@@ -24,15 +24,15 @@
 #ifdef __ANDROID__
 #include <android/log.h>
 #define LOG(fmt, ...) do { \
-    __android_log_print(ANDROID_LOG_INFO, "ForgeMint", fmt, ##__VA_ARGS__); \
+    __android_log_print(ANDROID_LOG_INFO, "ForgeStore", fmt, ##__VA_ARGS__); \
 } while(0)
 #define LOGD(fmt, ...) do { \
-    __android_log_print(ANDROID_LOG_DEBUG, "ForgeMint", fmt, ##__VA_ARGS__); \
+    __android_log_print(ANDROID_LOG_DEBUG, "ForgeStore", fmt, ##__VA_ARGS__); \
 } while(0)
 #else
 #include <stdio.h>
-#define LOG(fmt, ...)  fprintf(stderr, "ForgeMint [I] " fmt "\n", ##__VA_ARGS__)
-#define LOGD(fmt, ...) fprintf(stderr, "ForgeMint [D] " fmt "\n", ##__VA_ARGS__)
+#define LOG(fmt, ...)  fprintf(stderr, "ForgeStore [I] " fmt "\n", ##__VA_ARGS__)
+#define LOGD(fmt, ...) fprintf(stderr, "ForgeStore [D] " fmt "\n", ##__VA_ARGS__)
 #endif
 
 #endif

@@ -24,7 +24,7 @@ val gitExecutor = objects.newInstance(GitExecutor::class.java)
 val gitCommitCount = gitExecutor.execute("git rev-list HEAD --count", rootDir).toIntOrNull() ?: 0
 val gitCommitHash = gitExecutor.execute("git rev-parse --verify --short HEAD", rootDir).ifEmpty { "local" }
 val verName = "v0.1"
-val appId = "com.dere3046.forgemint"
+val appId = "com.dere3046.forgestore"
 
 android {
     namespace = appId
@@ -96,7 +96,7 @@ androidComponents {
         val capitalized = variant.name.replaceFirstChar { it.uppercase() }
 
         val tempModuleDir = project.layout.buildDirectory.dir("module/${variant.name}")
-        val zipFileName = "forgemint-$verName-$gitCommitCount-$gitCommitHash-$capitalized.zip"
+        val zipFileName = "forgestore-$verName-$gitCommitCount-$gitCommitHash-$capitalized.zip"
 
         val prepareModuleFilesTask =
             tasks.register<Sync>("prepareModuleFiles${capitalized}") {
@@ -117,7 +117,7 @@ androidComponents {
                     )
                 ) {
                     into("lib")
-                    include("**/libforgemint.so", "**/libinject.so")
+                    include("**/libforgestore.so", "**/libinject.so")
                 }
 
                 val sourceModuleDir = rootProject.projectDir.resolve("module")

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(forgemint C CXX)
+project(forgestore C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti -fno-exceptions")
@@ -48,19 +48,19 @@ set_target_properties(binder PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/stubs"
 )
 
-add_library(forgemint SHARED
+add_library(forgestore SHARED
     main.c
     hook.cpp
     ${RAPLT_SRC}
 )
-target_include_directories(forgemint PRIVATE
+target_include_directories(forgestore PRIVATE
     .
     ${RAPLT_INC}
     ext
 )
-target_link_libraries(forgemint PRIVATE binder utils log)
+target_link_libraries(forgestore PRIVATE binder utils log)
 
-target_compile_options(forgemint PRIVATE
+target_compile_options(forgestore PRIVATE
     -Wall -Wextra -Werror
     -Wno-unused-parameter
     -Wno-gnu-zero-variadic-macro-arguments
@@ -72,5 +72,5 @@ target_include_directories(libinject.so PRIVATE .)
 target_link_libraries(libinject.so log dl)
 target_compile_options(libinject.so PRIVATE -Wall -Wextra -Werror -Wno-unused-parameter)
 
-add_library(forgemint_kmsg SHARED kmsg.c)
-target_compile_options(forgemint_kmsg PRIVATE -Wall -Wextra -Werror -Wno-unused-parameter)
+add_library(forgestore_kmsg SHARED kmsg.c)
+target_compile_options(forgestore_kmsg PRIVATE -Wall -Wextra -Werror -Wno-unused-parameter)

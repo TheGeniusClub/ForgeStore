@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.os.Parcel
 import android.system.keystore2.IKeystoreSecurityLevel
@@ -39,7 +39,7 @@ import kotlin.concurrent.withLock
 
 object GeneratedKeyPersistence {
 
-    private const val DIR = "/data/adb/forgemint/keys"
+    private const val DIR = "/data/adb/forgestore/keys"
     private const val FORMAT_VERSION = 2
     private val locks = ConcurrentHashMap<String, ReentrantLock>()
     private val certFactory by lazy { CertificateFactory.getInstance("X.509") }

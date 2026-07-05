@@ -35,8 +35,8 @@
 #include <android/dlext.h>
 
 #include <android/log.h>
-#define LOG(fmt, ...)  __android_log_print(ANDROID_LOG_INFO, "ForgeMint", fmt, ##__VA_ARGS__)
-#define LOGE(fmt, ...) __android_log_print(ANDROID_LOG_ERROR, "ForgeMint", fmt, ##__VA_ARGS__)
+#define LOG(fmt, ...)  __android_log_print(ANDROID_LOG_INFO, "ForgeStore", fmt, ##__VA_ARGS__)
+#define LOGE(fmt, ...) __android_log_print(ANDROID_LOG_ERROR, "ForgeStore", fmt, ##__VA_ARGS__)
 
 #if defined(__aarch64__)
 #define REG_PC(r)      ((r)->pc)
@@ -229,7 +229,7 @@ static void gen_rand(char *buf, int len)
 static void set_status_ok(void)
 {
     char path[256];
-    snprintf(path, sizeof(path), "/data/adb/modules/forgemint/module.prop");
+    snprintf(path, sizeof(path), "/data/adb/modules/forgestore/module.prop");
     int fd = open(path, O_RDONLY);
     if (fd < 0) return;
     char buf[4096] = {0};
@@ -464,7 +464,7 @@ static int inject_library(int pid, const char *lib_path)
         int found = 0;
         if (f) {
             while (fgets(line, sizeof(line), f))
-                if (strstr(line, "libforgemint.so")) { found = 1; break; }
+                if (strstr(line, "libforgestore.so")) { found = 1; break; }
             fclose(f);
         }
         if (found) { LOG("already injected, skipping"); return 0; }

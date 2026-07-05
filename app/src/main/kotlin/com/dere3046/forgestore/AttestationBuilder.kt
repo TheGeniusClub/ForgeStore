@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.os.Build
 import android.os.ServiceManager
@@ -188,7 +188,7 @@ object AttestationBuilder {
     }
 
     private val hbk: ByteArray by lazy {
-        val file = java.io.File("/data/adb/forgemint", "hbk")
+        val file = java.io.File("/data/adb/forgestore", "hbk")
         if (file.exists() && file.length() == 32L) {
             file.readBytes()
         } else {

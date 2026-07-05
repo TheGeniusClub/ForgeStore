@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
@@ -25,7 +25,7 @@ import java.security.SecureRandom
 
 object TeeChecker {
 
-    private const val TEST_ALIAS = "forgemint_tee_check"
+    private const val TEST_ALIAS = "forgestore_tee_check"
 
     fun isTeeFunctional(): Boolean {
         return try {

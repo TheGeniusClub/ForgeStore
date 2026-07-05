@@ -33,7 +33,7 @@ case "$ARCH" in
 esac
 
 VERSION=$(grep_prop version "$TMPDIR/module.prop")
-ui_print "- ForgeMint $VERSION on $ARCH"
+ui_print "- ForgeStore $VERSION on $ARCH"
 
 ui_print "- Verifying module integrity"
 unzip -o "$ZIPFILE" "verify.sh" -d "$TMPDIR" >&2
@@ -43,8 +43,8 @@ verify_module "$ZIPFILE"
 mkdir -p "$MODPATH/lib"
 ui_print "- Extracting module files"
 unzip -o "$ZIPFILE" "module.prop" -d "$MODPATH" >&2
-unzip -o "$ZIPFILE" "lib/$ARCH_DIR/libforgemint.so" "lib/$ARCH_DIR/libinject.so" -d "$MODPATH" >&2
-mv "$MODPATH/lib/$ARCH_DIR/libforgemint.so" "$MODPATH/lib/"
+unzip -o "$ZIPFILE" "lib/$ARCH_DIR/libforgestore.so" "lib/$ARCH_DIR/libinject.so" -d "$MODPATH" >&2
+mv "$MODPATH/lib/$ARCH_DIR/libforgestore.so" "$MODPATH/lib/"
 mv "$MODPATH/lib/$ARCH_DIR/libinject.so" "$MODPATH/lib/"
 rmdir "$MODPATH/lib/$ARCH_DIR"
 unzip -o "$ZIPFILE" "service.apk" -d "$MODPATH" >&2
@@ -60,7 +60,7 @@ set_perm "$MODPATH/daemon" 0 0 0755
 set_perm "$MODPATH/service.sh" 0 0 0755
 
 ui_print "- Setting up config directory"
-DATA_DIR="/data/adb/forgemint"
+DATA_DIR="/data/adb/forgestore"
 mkdir -p "$DATA_DIR"
 [ ! -f "$DATA_DIR/hbk" ] && {
     dd if=/dev/random of="$DATA_DIR/hbk" bs=32 count=1 2>/dev/null

@@ -15,7 +15,7 @@
  * with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-package com.dere3046.forgemint
+package com.dere3046.forgestore
 
 object AttestationConstants {
     val ATTESTATION_OID = "1.3.6.1.4.1.11129.2.1.17"
