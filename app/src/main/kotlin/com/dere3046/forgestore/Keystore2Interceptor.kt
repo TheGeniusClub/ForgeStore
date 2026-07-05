@@ -86,7 +86,18 @@ class Keystore2Interceptor(
             data.enforceInterface(IKeystoreService.DESCRIPTOR)
             val descriptor = data.readTypedObject(KeyDescriptor.CREATOR) ?: return TransactionResult.Continue
             val entry = findEntryByNspace(uid, descriptor.nspace)
-                ?: return TransactionResult.ContinueAndSkipPost
+                ?: run {
+                    val nspace = descriptor.nspace
+                    teeInterceptor.teeResponses.entries.find { it.key.uid == uid && it.value.metadata?.key?.nspace == nspace }?.let {
+                        teeInterceptor.teeResponses.remove(it.key)
+                        teeInterceptor.patchedChains.remove(it.key)
+                    }
+                    strongBoxInterceptor?.teeResponses?.entries?.find { it.key.uid == uid && it.value.metadata?.key?.nspace == nspace }?.let {
+                        strongBoxInterceptor.teeResponses.remove(it.key)
+                        strongBoxInterceptor.patchedChains.remove(it.key)
+                    }
+                    return TransactionResult.ContinueAndSkipPost
+                }
 
             val publicCert = data.createByteArray()
             val certificateChain = data.createByteArray()
@@ -237,7 +248,23 @@ class Keystore2Interceptor(
                     findEntryByNspace(uid, keyDescriptor.nspace)
                 else null
 
-            if (entry == null) return TransactionResult.ContinueAndSkipPost
+            if (entry == null) {
+                if (keyDescriptor.alias != null) {
+                    val kid = StateManager.KeyIdentifier(uid, keyDescriptor.alias)
+                    if (teeInterceptor.teeResponses.containsKey(kid) ||
+                        (strongBoxInterceptor?.teeResponses?.containsKey(kid) == true)) {
+                        if (Build.VERSION.SDK_INT < 36) return replyKeystoreError(6)
+                        val gnsp = StateManager.issueGrant(kid, granteeUid, accessVector)
+                        val reply = Parcel.obtain()
+                        reply.writeNoException()
+                        reply.writeTypedObject(KeyDescriptor().apply {
+                            domain = Domain.GRANT; nspace = gnsp; alias = null; blob = null
+                        }, 0)
+                        return TransactionResult.OverrideReply(reply)
+                    }
+                }
+                return TransactionResult.ContinueAndSkipPost
+            }
 
             if (Build.VERSION.SDK_INT < 36) {
                 return replyKeystoreError(6)
@@ -272,7 +299,20 @@ class Keystore2Interceptor(
                     findEntryByNspace(uid, keyDescriptor.nspace)
                 else null
 
-            if (entry == null) return TransactionResult.ContinueAndSkipPost
+            if (entry == null) {
+                if (keyDescriptor.alias != null) {
+                    val kid = StateManager.KeyIdentifier(uid, keyDescriptor.alias)
+                    if (teeInterceptor.teeResponses.containsKey(kid) ||
+                        (strongBoxInterceptor?.teeResponses?.containsKey(kid) == true)) {
+                        if (android.os.Build.VERSION.SDK_INT < 36) return replyKeystoreError(6)
+                        StateManager.revokeGrantForOwner(kid, granteeUid)
+                        val reply = Parcel.obtain()
+                        reply.writeNoException()
+                        return TransactionResult.OverrideReply(reply)
+                    }
+                }
+                return TransactionResult.ContinueAndSkipPost
+            }
             if (android.os.Build.VERSION.SDK_INT < 36) return replyKeystoreError(6)
 
             StateManager.revokeGrantForOwner(StateManager.KeyIdentifier(uid, entry.alias), granteeUid)
@@ -329,6 +369,17 @@ class Keystore2Interceptor(
                 if (owningInterceptor != null) {
                     KeyMintInterceptor.cleanupKeyData(owningInterceptor, keyId)
                 }
+                deletedSoftwareKeys.add(keyId)
+                val reply = Parcel.obtain()
+                reply.writeNoException()
+                return TransactionResult.OverrideReply(reply)
+            }
+
+            val keyId = StateManager.KeyIdentifier(uid, alias)
+            if (teeInterceptor.teeResponses.containsKey(keyId) ||
+                (strongBoxInterceptor?.teeResponses?.containsKey(keyId) == true)) {
+                KeyMintInterceptor.cleanupKeyData(teeInterceptor, keyId)
+                strongBoxInterceptor?.let { KeyMintInterceptor.cleanupKeyData(it, keyId) }
                 deletedSoftwareKeys.add(keyId)
                 val reply = Parcel.obtain()
                 reply.writeNoException()

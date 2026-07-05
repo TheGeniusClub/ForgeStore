@@ -222,6 +222,7 @@ class KeyMintInterceptor(
             }
 
             Logger.d("PATCH mode post-generateKey for UID=$callingUid")
+            cleanupKeyData(this, keyId)
             val patchedChain = AttestationPatcher.patchCertificateChain(originalChain, callingUid)
 
             patchedChains[keyId] = patchedChain
@@ -297,6 +298,7 @@ class KeyMintInterceptor(
                 Logger.d("importKey alias=$alias UID=$uid → cleaning up generated key")
                 cleanupKeyData(this, keyId)
             }
+            importedKeys.add(keyId)
 
             if (!ConfigManager.shouldPatch(uid)) return TransactionResult.Skip
 
@@ -534,12 +536,15 @@ class KeyMintInterceptor(
         }
 
         fun getGeneratedKeyResponse(interceptor: KeyMintInterceptor, keyId: StateManager.KeyIdentifier): KeyEntryResponse? {
-            val entry = interceptor.generatedKeys["${keyId.uid}:${keyId.alias}"] ?: return null
-            val binder = entry.securityLevelBinder ?: return null
-            return KeyEntryResponse().apply {
-                metadata = entry.metadata
-                iSecurityLevel = binder
+            val entry = interceptor.generatedKeys["${keyId.uid}:${keyId.alias}"]
+            if (entry != null) {
+                val binder = entry.securityLevelBinder ?: return null
+                return KeyEntryResponse().apply {
+                    metadata = entry.metadata
+                    iSecurityLevel = binder
+                }
             }
+            return interceptor.teeResponses[keyId]
         }
 
         fun ownsKeyResponse(interceptor: KeyMintInterceptor, keyId: StateManager.KeyIdentifier): Boolean {
