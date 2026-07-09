@@ -21,7 +21,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "ForgeStore"
 include(
-    ":app",
-    ":stub",
-    ":module"
+    ":library",
+    ":module",
+    ":service",
+    ":stub"
 )

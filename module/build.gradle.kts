@@ -38,8 +38,8 @@ listOf(
         description = "Prepares module files for ${variantName}."
 
         dependsOn(
-            ":app:assemble${variantCapped}",
-            ":app:strip${variantCapped}DebugSymbols"
+            ":service:assemble${variantCapped}",
+            ":library:strip${variantCapped}DebugSymbols"
         )
 
         doFirst {
@@ -49,12 +49,12 @@ listOf(
         }
 
         into(moduleDir)
-            from(project(":app").layout.buildDirectory.file("outputs/apk/${variantLowered}")) {
+            from(project(":service").layout.buildDirectory.file("outputs/apk/${variantLowered}")) {
                 include(
-                    "app-${variantLowered}.apk"
+                    "service-${variantLowered}.apk"
                 )
                 rename(
-                    "app-${variantLowered}.apk",
+                    "service-${variantLowered}.apk",
                     "service.apk"
                 )
             }
@@ -76,7 +76,7 @@ listOf(
                 )
             }
         into("lib") {
-            from(project(":app").layout.buildDirectory.dir("intermediates/stripped_native_libs/${variantLowered}/strip${variantCapped}DebugSymbols/out/lib")) {
+            from(project(":library").layout.buildDirectory.dir("intermediates/stripped_native_libs/${variantLowered}/strip${variantCapped}DebugSymbols/out/lib")) {
                 include(
                     "**/libforgestore.so",
                     "**/libinject.so"

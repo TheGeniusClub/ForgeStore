@@ -7,7 +7,7 @@ dependencies {
 }
 
 android {
-    namespace = "org.matrix.stub"
+    namespace = "service.stub"
     buildToolsVersion = "36.0.0"
     compileSdk = 36
     defaultConfig {

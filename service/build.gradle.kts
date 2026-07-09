@@ -25,13 +25,6 @@ android {
         versionName = verName
     }
 
-    externalNativeBuild {
-        cmake {
-            path = file("src/main/cpp/CMakeLists.txt")
-            buildStagingDirectory = layout.buildDirectory.get().asFile
-        }
-    }
-
     buildTypes {
         release {
             isMinifyEnabled = true
@@ -44,7 +37,10 @@ android {
     packaging {
         resources {
             excludes += setOf(
-                "META-INF/versions/**"
+                "kotlin/**",
+                "META-INF/**",
+                "org/**",
+                "kotlin-tooling-metadata.json"
             )
         }
     }
